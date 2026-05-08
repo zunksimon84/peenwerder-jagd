@@ -13,6 +13,25 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <div id="gate" hidden>
+      <div class="gate-card">
+        <div class="gate-brand">
+          <span class="brand-pray">PREYE</span>
+          <svg class="brand-eye" viewBox="0 0 24 14" aria-hidden="true">
+            <ellipse cx="12" cy="7" rx="10" ry="6" stroke="currentColor" fill="none" stroke-width="1.4" />
+            <circle cx="12" cy="7" r="2.8" fill="currentColor" />
+          </svg>
+        </div>
+        <p class="gate-sub">Privater Zugang</p>
+        <form id="gate-form" autocomplete="on">
+          <input id="gate-pw" type="password" autocomplete="current-password"
+                 placeholder="Passwort" required />
+          <button type="submit">Öffnen</button>
+        </form>
+        <p id="gate-error" class="gate-error" hidden></p>
+      </div>
+    </div>
+
     <header id="topbar">
       <h1>
         <span class="brand-pray">PREYE</span>

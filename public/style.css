@@ -643,6 +643,79 @@ body {
   color: var(--muted);
 }
 
+#gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--green-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.gate-card {
+  background: var(--card);
+  padding: 28px 24px;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.gate-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--green-dark);
+  font-size: 22px;
+}
+
+.gate-brand .brand-eye {
+  width: 26px;
+  height: 16px;
+}
+
+.gate-sub {
+  color: var(--muted);
+  margin: 6px 0 18px;
+  font-size: 13px;
+}
+
+#gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#gate-pw {
+  font: inherit;
+  font-size: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+#gate-form button {
+  padding: 13px;
+  background: var(--green-dark);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.gate-error {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+}
+
 #toast {
   position: fixed;
   left: 50%;

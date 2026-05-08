@@ -27,6 +27,7 @@ async function main() {
     return;
   }
   try {
+    if (!(await passGate())) return; // private + wrong/missing password
     await loadMapsScript(cfg.GOOGLE_MAPS_API_KEY);
     initMap();
     await bootstrap();
@@ -37,6 +38,85 @@ async function main() {
     console.error(err);
     showToast("Fehler beim Laden: " + err.message, "error", 6000);
   }
+}
+
+// Build a URL for the Apps Script backend with action + params + (if set)
+// access token. All data fetches go through this so going private is a
+// one-flag flip.
+function backendUrl(action, params = {}) {
+  const u = new URL(cfg.APPS_SCRIPT_URL);
+  u.searchParams.set("action", action);
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null && v !== "") u.searchParams.set(k, v);
+  }
+  const token = localStorage.getItem("preye.token");
+  if (token) u.searchParams.set("token", token);
+  return u.toString();
+}
+
+async function passGate() {
+  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) return true;
+  let isPublic = true;
+  try {
+    const res = await fetch(cfg.APPS_SCRIPT_URL + "?action=site-status");
+    const data = await res.json();
+    isPublic = !!data.is_public;
+  } catch (err) {
+    console.warn("site-status check failed, allowing through:", err);
+    return true;
+  }
+  if (isPublic) return true;
+  const cached = localStorage.getItem("preye.token");
+  if (cached) {
+    try {
+      const v = await fetch(cfg.APPS_SCRIPT_URL + "?action=verify-access&token=" + encodeURIComponent(cached));
+      const vr = await v.json();
+      if (vr.ok) return true;
+    } catch (err) {
+      // fall through to prompt
+    }
+    localStorage.removeItem("preye.token");
+  }
+  return showGate();
+}
+
+function showGate() {
+  return new Promise((resolve) => {
+    const gate = $("#gate");
+    const form = $("#gate-form");
+    const input = $("#gate-pw");
+    const errorEl = $("#gate-error");
+    gate.hidden = false;
+    setTimeout(() => input.focus(), 50);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const password = input.value;
+      if (!password) return;
+      errorEl.hidden = true;
+      const submitBtn = form.querySelector("button");
+      submitBtn.disabled = true;
+      try {
+        const res = await fetch(
+          cfg.APPS_SCRIPT_URL + "?action=verify-access&password=" + encodeURIComponent(password)
+        );
+        const data = await res.json();
+        if (data.ok && data.token) {
+          localStorage.setItem("preye.token", data.token);
+          gate.hidden = true;
+          resolve(true);
+        } else {
+          errorEl.textContent = "Falsches Passwort.";
+          errorEl.hidden = false;
+          input.select();
+        }
+      } catch (err) {
+        errorEl.textContent = "Fehler: " + (err.message || err);
+        errorEl.hidden = false;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    };
+  });
 }
 
 // Track iOS Chrome / Safari URL-bar position so position:fixed modals
@@ -93,7 +173,7 @@ async function bootstrap() {
   // least renders if the backend isn't configured yet.
   if (cfg.APPS_SCRIPT_URL && !cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
     try {
-      const res = await fetch(cfg.APPS_SCRIPT_URL + "?action=bootstrap");
+      const res = await fetch(backendUrl("bootstrap"));
       if (res.ok) {
         const data = await res.json();
         state.posts = data.posts || [];
@@ -371,13 +451,12 @@ async function refreshAggregates() {
   state.aggregates.clear();
   if (cfg.APPS_SCRIPT_URL && !cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
     try {
-      const url = new URL(cfg.APPS_SCRIPT_URL);
-      url.searchParams.set("action", "aggregates");
       const range = rangeToDates(state.filters.range);
-      if (range.from) url.searchParams.set("from", range.from);
-      if (range.to) url.searchParams.set("to", range.to);
-      if (state.filters.species) url.searchParams.set("species", state.filters.species);
-      const res = await fetch(url.toString());
+      const res = await fetch(backendUrl("aggregates", {
+        from: range.from,
+        to: range.to,
+        species: state.filters.species,
+      }));
       if (res.ok) {
         const data = await res.json();
         for (const row of data) state.aggregates.set(row.post_id, row.total_count);
@@ -452,11 +531,7 @@ async function loadHistory(postId) {
   listEl.innerHTML = "";
   histEl.hidden = false;
   try {
-    const url = new URL(cfg.APPS_SCRIPT_URL);
-    url.searchParams.set("action", "history");
-    url.searchParams.set("post_id", postId);
-    url.searchParams.set("limit", "20");
-    const res = await fetch(url.toString());
+    const res = await fetch(backendUrl("history", { post_id: postId, limit: "20" }));
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     // Race guard: if the dropdown moved on while we were waiting, drop this.
@@ -614,6 +689,10 @@ async function submitHarvest(ev) {
       };
     }
 
+    // Attach the access token in the body — POST requests can't easily
+    // tack on URL params under our Content-Type: text/plain rule, and we
+    // need to keep the request CORS-simple.
+    body.token = localStorage.getItem("preye.token") || "";
     // text/plain keeps this a "simple" CORS request; no preflight needed.
     const res = await fetch(cfg.APPS_SCRIPT_URL, {
       method: "POST",
@@ -755,12 +834,8 @@ async function openStrecke() {
     return;
   }
   try {
-    const url = new URL(cfg.APPS_SCRIPT_URL);
-    url.searchParams.set("action", "strecke");
     const r = rangeToDates(state.filters.range);
-    if (r.from) url.searchParams.set("from", r.from);
-    if (r.to) url.searchParams.set("to", r.to);
-    const res = await fetch(url.toString());
+    const res = await fetch(backendUrl("strecke", { from: r.from, to: r.to }));
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (data.error) throw new Error(data.error);

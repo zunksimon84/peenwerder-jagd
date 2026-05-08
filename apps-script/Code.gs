@@ -30,12 +30,20 @@ const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "n
 
 function doGet(e) {
   try {
-    const action = (e.parameter && e.parameter.action) || "bootstrap";
+    const params = (e && e.parameter) || {};
+    const action = params.action || "bootstrap";
+    // Public endpoints — no token needed.
+    if (action === "site-status") return json_(siteStatus_());
+    if (action === "verify-access") return json_(verifyAccess_(params));
+    // Everything else requires a valid token if the site is private.
+    if (!checkToken_(params.token)) {
+      return json_({ error: "private", code: "AUTH_REQUIRED" });
+    }
     if (action === "bootstrap") return json_(bootstrap_());
-    if (action === "aggregates") return json_(aggregates_(e.parameter || {}));
+    if (action === "aggregates") return json_(aggregates_(params));
     if (action === "sync") return json_(syncPostsFromKml());
-    if (action === "history") return json_(history_(e.parameter || {}));
-    if (action === "strecke") return json_(strecke_(e.parameter || {}));
+    if (action === "history") return json_(history_(params));
+    if (action === "strecke") return json_(strecke_(params));
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -45,6 +53,9 @@ function doGet(e) {
 function doPost(e) {
   try {
     const body = JSON.parse((e.postData && e.postData.contents) || "{}");
+    if (!checkToken_(body.token)) {
+      return json_({ error: "private", code: "AUTH_REQUIRED" });
+    }
     const result = logHarvest_(body);
     return json_(result, result.error ? 400 : 200);
   } catch (err) {
@@ -654,6 +665,108 @@ function installArchiveTrigger() {
     }
   }
   ScriptApp.newTrigger("archivePastSeasons").timeBased().atHour(1).everyDays(1).create();
+}
+
+// ---------- Privacy / access control ----------
+// Site mode + access password live in Script Properties (only the script
+// owner can read/write). Anyone can flip the toggle from the sheet via
+// the 🔒 Privacy menu added by onOpen — that menu only renders for users
+// with edit access to the sheet, which is just Simon.
+
+const PROP_SITE_MODE = "siteMode";
+const PROP_ACCESS_HASH = "accessPasswordHash";
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("🔒 Privacy")
+    .addItem("Privat schalten (Passwort setzen)", "menu_setPrivate")
+    .addItem("Öffentlich schalten", "menu_setPublic")
+    .addItem("Status anzeigen", "menu_showStatus")
+    .addToUi();
+}
+
+function menu_setPrivate() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    "Privat schalten",
+    "Neues Zugangs-Passwort eingeben (min 4 Zeichen):",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+  const password = String(response.getResponseText() || "").trim();
+  if (password.length < 4) {
+    ui.alert("Passwort zu kurz (min 4 Zeichen).");
+    return;
+  }
+  const hash = sha256_(password);
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(PROP_SITE_MODE, "private");
+  props.setProperty(PROP_ACCESS_HASH, hash);
+  ui.alert(
+    "Site ist jetzt PRIVAT.\n\nZugangs-Passwort:  " + password +
+    "\n\nNur an Vertraute weitergeben."
+  );
+}
+
+function menu_setPublic() {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(PROP_SITE_MODE, "public");
+  props.deleteProperty(PROP_ACCESS_HASH);
+  SpreadsheetApp.getUi().alert("Site ist jetzt ÖFFENTLICH (kein Passwort nötig).");
+}
+
+function menu_showStatus() {
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const mode = props[PROP_SITE_MODE] || "public";
+  let msg = "Status: " + mode.toUpperCase();
+  if (mode === "private") {
+    msg += "\nPasswort gesetzt: " + (props[PROP_ACCESS_HASH] ? "✓ ja" : "✗ NEIN (bitte erneut setzen)");
+  }
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+function isPublic_() {
+  const mode = PropertiesService.getScriptProperties().getProperty(PROP_SITE_MODE);
+  return mode !== "private";
+}
+
+function getAccessHash_() {
+  return PropertiesService.getScriptProperties().getProperty(PROP_ACCESS_HASH) || "";
+}
+
+function checkToken_(token) {
+  if (isPublic_()) return true;
+  const stored = getAccessHash_();
+  if (!stored) return false; // private but no password set — fail closed
+  return String(token || "") === stored;
+}
+
+function siteStatus_() {
+  return { is_public: isPublic_() };
+}
+
+function verifyAccess_(params) {
+  if (isPublic_()) return { ok: true, token: "" };
+  const stored = getAccessHash_();
+  if (!stored) return { ok: false, error: "no password set" };
+  const token = String(params.token || "");
+  if (token && token === stored) return { ok: true, token: stored };
+  const password = String(params.password || "");
+  if (password && sha256_(password) === stored) return { ok: true, token: stored };
+  return { ok: false };
+}
+
+function sha256_(input) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    input,
+    Utilities.Charset.UTF_8
+  );
+  let hex = "";
+  for (let i = 0; i < bytes.length; i++) {
+    hex += ("0" + (bytes[i] & 0xff).toString(16)).slice(-2);
+  }
+  return hex;
 }
 
 // ---------- Response helpers ----------
