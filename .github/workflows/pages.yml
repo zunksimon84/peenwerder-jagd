@@ -33,6 +33,28 @@ jobs:
             APPS_SCRIPT_URL: "${APPS_SCRIPT_URL}",
           };
           EOF
+      - name: Encrypt index.html with Staticrypt (if SITE_PASSWORD is set)
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          if [ -z "$SITE_PASSWORD" ]; then
+            echo "SITE_PASSWORD secret not set — skipping encryption."
+            exit 0
+          fi
+          npx -y staticrypt public/index.html \
+            --password "$SITE_PASSWORD" \
+            --short \
+            --remember 30 \
+            --template-button "Öffnen" \
+            --template-instructions "Bitte Passwort eingeben." \
+            --template-color-primary "#1f3a1f" \
+            --template-color-secondary "#f6f4ef" \
+            --template-title "Pray 👁 Peenwerder Jagd" \
+            --template-placeholder "Passwort" \
+            -d public_encrypted
+          mv public_encrypted/index.html public/index.html
+          rm -rf public_encrypted
+          echo "index.html encrypted."
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
