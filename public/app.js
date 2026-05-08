@@ -287,7 +287,8 @@ async function loadHistory(postId) {
       li.innerHTML =
         `<span class="when">${when}</span>` +
         `<strong>${escapeHtml(h.species)}</strong> ×${h.count}` +
-        ` <span class="who">${escapeHtml(h.hunter)}</span>`;
+        ` <span class="who">${escapeHtml(h.hunter)}</span>` +
+        windHtml(h.wind_speed, h.wind_dir);
       listEl.appendChild(li);
     }
   } catch (err) {
@@ -300,6 +301,27 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
+}
+
+const COMPASS_16 = ["N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+
+function degToCompass(deg) {
+  if (!Number.isFinite(deg)) return "";
+  return COMPASS_16[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16];
+}
+
+// Tiny inline wind indicator: arrow points to where the wind is COMING
+// FROM (meteorological convention; what hunters actually want), with the
+// speed in km/h beside it. Tooltip gives compass direction.
+function windHtml(speed, dir) {
+  if (speed == null || dir == null) return "";
+  const compass = degToCompass(dir);
+  const tip = `Wind aus ${compass} (${Math.round(dir)}°), ${speed} km/h`;
+  return ` <span class="wind" title="${tip}">` +
+    `<svg viewBox="0 0 12 12" style="transform: rotate(${dir}deg)" aria-hidden="true">` +
+    `<path d="M6 1 L6 11 M6 1 L3 5 M6 1 L9 5" stroke="currentColor" stroke-width="1.4" ` +
+    `fill="none" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `</svg>${speed} km/h</span>`;
 }
 
 function openSheet(postId) {

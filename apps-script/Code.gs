@@ -23,7 +23,7 @@ const SHEETS = {
 
 const POST_HEADER = ["id", "name", "area", "lat", "lng"];
 const HUNTER_HEADER = ["name"];
-const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes"];
+const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir"];
 
 // ---------- HTTP entrypoints ----------
 
@@ -121,12 +121,16 @@ function history_(params) {
     .filter(function (r) { return String(r.post_id).trim() === post_id; })
     .map(function (r) {
       const ts = new Date(r.timestamp);
+      const ws = r.wind_speed;
+      const wd = r.wind_dir;
       return {
         timestamp: isNaN(ts) ? null : ts.toISOString(),
         hunter: String(r.hunter || ""),
         species: String(r.species || ""),
         count: Number(r.count) || 0,
         notes: String(r.notes || ""),
+        wind_speed: ws === "" || ws === null || ws === undefined ? null : Number(ws),
+        wind_dir: wd === "" || wd === null || wd === undefined ? null : Number(wd),
       };
     })
     .sort(function (a, b) {
@@ -222,8 +226,23 @@ function logHarvest_(body) {
   }
   const canonical = known || hunter;
 
+  // Pick the lat/lng to query weather for.
+  const targetPost = createdPost || posts.find(function (p) { return p.id === post_id; });
+  const weather = (targetPost && Number.isFinite(targetPost.lat) && Number.isFinite(targetPost.lng))
+    ? fetchWeather_(targetPost.lat, targetPost.lng, new Date())
+    : null;
+
   const sheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
-  sheet.appendRow([new Date().toISOString(), canonical, post_id, speciesVal, count, notes]);
+  appendByName_(sheet, {
+    timestamp: new Date().toISOString(),
+    hunter: canonical,
+    post_id: post_id,
+    species: speciesVal,
+    count: count,
+    notes: notes,
+    wind_speed: weather ? weather.wind_speed : "",
+    wind_dir: weather ? weather.wind_dir : "",
+  });
 
   const out = { ok: true, hunter: canonical };
   if (createdPost) out.post = createdPost;
@@ -275,8 +294,36 @@ function ensureSheet_(ss, name, header) {
     sheet.appendRow(header);
     sheet.getRange(1, 1, 1, header.length).setFontWeight("bold");
     sheet.setFrozenRows(1);
+    return sheet;
+  }
+  // Additive migration: append any header columns the sheet doesn't have
+  // yet. Existing column positions are never touched, so old rows keep
+  // their data and new rows get the new fields written via appendByName_.
+  const lastCol = sheet.getLastColumn();
+  const existing = lastCol > 0
+    ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (s) { return String(s).trim(); })
+    : [];
+  for (let i = 0; i < header.length; i++) {
+    if (existing.indexOf(header[i]) === -1) {
+      const newCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newCol).setValue(header[i]).setFontWeight("bold");
+    }
   }
   return sheet;
+}
+
+// Append a row by header NAME so we don't depend on column order. The
+// sheet's current header is read each call (cheap) so that additive
+// migrations or manual reorderings still work.
+function appendByName_(sheet, values) {
+  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const row = new Array(header.length).fill("");
+  Object.keys(values).forEach(function (key) {
+    const i = header.indexOf(key);
+    if (i >= 0) row[i] = values[key];
+  });
+  sheet.appendRow(row);
 }
 
 // ---------- KML sync ----------
@@ -431,6 +478,111 @@ function installPostsSyncTrigger() {
     }
   }
   ScriptApp.newTrigger("syncPostsFromKml").timeBased().everyHours(1).create();
+}
+
+// ---------- Weather (Open-Meteo, no key) ----------
+
+function fetchWeather_(lat, lng, when) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const ts = new Date(when);
+  if (isNaN(ts)) return null;
+  const ageDays = (Date.now() - ts.getTime()) / 86400000;
+
+  // Forecast endpoint covers ~last 92 days plus the current day; archive
+  // endpoint goes back to 1940 but lags by ~5 days. Pick whichever fits.
+  let url;
+  if (ageDays < 5) {
+    const past = Math.max(1, Math.ceil(ageDays) + 1);
+    url = "https://api.open-meteo.com/v1/forecast"
+      + "?latitude=" + lat + "&longitude=" + lng
+      + "&hourly=wind_speed_10m,wind_direction_10m"
+      + "&past_days=" + past + "&forecast_days=1"
+      + "&timezone=UTC&windspeed_unit=kmh";
+  } else {
+    const dayStr = ts.toISOString().slice(0, 10);
+    url = "https://archive-api.open-meteo.com/v1/archive"
+      + "?latitude=" + lat + "&longitude=" + lng
+      + "&start_date=" + dayStr + "&end_date=" + dayStr
+      + "&hourly=wind_speed_10m,wind_direction_10m"
+      + "&timezone=UTC&windspeed_unit=kmh";
+  }
+
+  try {
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) return null;
+    const data = JSON.parse(resp.getContentText());
+    if (!data.hourly || !data.hourly.time || !data.hourly.time.length) return null;
+    const targetMs = ts.getTime();
+    let bestIdx = -1;
+    let bestDiff = Infinity;
+    for (let i = 0; i < data.hourly.time.length; i++) {
+      const t = new Date(data.hourly.time[i] + "Z").getTime();
+      const diff = Math.abs(t - targetMs);
+      if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+    }
+    if (bestIdx < 0) return null;
+    const speed = data.hourly.wind_speed_10m[bestIdx];
+    const dir = data.hourly.wind_direction_10m[bestIdx];
+    if (!Number.isFinite(speed) || !Number.isFinite(dir)) return null;
+    return {
+      wind_speed: Math.round(speed * 10) / 10,
+      wind_dir: Math.round(dir),
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+// One-shot helper to fill weather columns on existing harvest rows that
+// were logged before the weather feature shipped. Run from the editor:
+//   Function dropdown → backfillWeather → ▶
+// Stops itself before hitting the per-execution time limit.
+function backfillWeather() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getUi().alert("Keine Strecke-Einträge vorhanden.");
+    return;
+  }
+  const lastCol = sheet.getLastColumn();
+  const header = sheet.getRange(1, 1, 1, lastCol).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const tsCol = header.indexOf("timestamp") + 1;
+  const postCol = header.indexOf("post_id") + 1;
+  const wsCol = header.indexOf("wind_speed") + 1;
+  const wdCol = header.indexOf("wind_dir") + 1;
+  if (!tsCol || !postCol || !wsCol || !wdCol) {
+    throw new Error("Missing required columns in harvests sheet");
+  }
+
+  const posts = readPosts_();
+  const postMap = {};
+  for (let i = 0; i < posts.length; i++) postMap[posts[i].id] = posts[i];
+
+  const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  const start = Date.now();
+  let updated = 0;
+  let skipped = 0;
+  for (let i = 0; i < data.length; i++) {
+    if (Date.now() - start > 5 * 60 * 1000) break; // 5 min safety
+    const row = data[i];
+    const cur = row[wsCol - 1];
+    if (cur !== "" && cur !== null && cur !== undefined) { skipped++; continue; }
+    const post = postMap[String(row[postCol - 1])];
+    if (!post || !Number.isFinite(post.lat)) continue;
+    const ts = new Date(row[tsCol - 1]);
+    if (isNaN(ts)) continue;
+    const w = fetchWeather_(post.lat, post.lng, ts);
+    if (!w) continue;
+    sheet.getRange(i + 2, wsCol).setValue(w.wind_speed);
+    sheet.getRange(i + 2, wdCol).setValue(w.wind_dir);
+    updated++;
+    Utilities.sleep(150); // be polite to Open-Meteo
+  }
+  SpreadsheetApp.getUi().alert(
+    "Wetter-Backfill: " + updated + " ergänzt, " + skipped + " bereits vorhanden."
+  );
 }
 
 // ---------- Season rollover ----------
