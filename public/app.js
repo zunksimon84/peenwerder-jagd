@@ -84,6 +84,11 @@ function initMap() {
     fullscreenControl: false,
     gestureHandling: "greedy",
   });
+  // Re-render the heatmap whenever the user zooms so radiusPixels can
+  // scale with zoom level (smaller blobs when zoomed out).
+  state.map.addListener("zoom_changed", () => {
+    if (state.deckOverlay) renderHeatmap();
+  });
 }
 
 async function bootstrap() {
@@ -172,6 +177,11 @@ function renderHeatmap() {
     });
   }
   if (state.deckOverlay) {
+    // Zoom-aware radius — small dots when looking at the whole Revier,
+    // bigger blobs when you zoom into a single Kanzel cluster. Clamped so
+    // it never gets unreadably small/huge.
+    const zoom = state.map.getZoom() || MAP_ZOOM;
+    const radiusPx = Math.max(10, Math.min(38, Math.round(zoom * 1.7 + 1)));
     const layers = points.length > 0 && window.deck && window.deck.HeatmapLayer
       ? [
           new window.deck.HeatmapLayer({
@@ -179,12 +189,16 @@ function renderHeatmap() {
             data: points,
             getPosition: (d) => [d.lng, d.lat],
             getWeight: (d) => d.weight,
-            radiusPixels: 30,
+            radiusPixels: radiusPx,
             intensity: 1,
+            // Smoother fade-out — default 0.05 cuts off too sharply.
+            threshold: 0.02,
+            // Higher-resolution internal texture for sharper edges.
+            weightsTextureSize: 2048,
             // colorDomain pins the "max red" at weight=20 — same calibration
             // we had under google.maps.visualization (maxIntensity:20).
             colorDomain: [0, 20],
-            opacity: 0.55,
+            opacity: 0.6,
           }),
         ]
       : [];
