@@ -167,7 +167,9 @@ function renderLeaderboard() {
   list.innerHTML = "";
   for (const r of top) {
     const li = document.createElement("li");
-    li.innerHTML = `${escapeHtml(r.post.name)} — <strong class="lb-count">${r.n}</strong>`;
+    li.innerHTML =
+      `<span class="lb-name">${escapeHtml(r.post.name)}</span>` +
+      `<strong class="lb-count">${r.n}</strong>`;
     li.style.cursor = "pointer";
     li.addEventListener("click", () => {
       state.map.panTo({ lat: r.post.lat, lng: r.post.lng });

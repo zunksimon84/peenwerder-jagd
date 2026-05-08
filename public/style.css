@@ -139,10 +139,26 @@ body {
   padding-left: 18px;
 }
 
+#leaderboard li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+#leaderboard .lb-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 #leaderboard .lb-count {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--green-dark);
+  flex-shrink: 0;
 }
 
 #sheet-backdrop {
