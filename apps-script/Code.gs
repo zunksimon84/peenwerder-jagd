@@ -84,7 +84,32 @@ function strecke_(params) {
   const by_species = Object.keys(counts)
     .map(function (sp) { return { species: sp, count: counts[sp] }; })
     .sort(function (a, b) { return b.count - a.count; });
-  return { by_species: by_species, total: total };
+
+  // Per-day counts for the current hunting season, regardless of the
+  // filter — the timeline always spans Apr 1 → Mar 31 so the user can see
+  // when the season's peak weeks were.
+  const seasonStart = seasonStartUtc_(new Date());
+  const dailyMap = {};
+  for (let j = 0; j < rows.length; j++) {
+    const r2 = rows[j];
+    const ts = new Date(r2.timestamp);
+    if (isNaN(ts) || ts < seasonStart) continue;
+    const dayKey = ts.toISOString().slice(0, 10); // YYYY-MM-DD
+    const n2 = Number(r2.count) || 0;
+    dailyMap[dayKey] = (dailyMap[dayKey] || 0) + n2;
+  }
+  const daily = Object.keys(dailyMap).sort().map(function (d) {
+    return { day: d, count: dailyMap[d] };
+  });
+  const seasonEnd = new Date(Date.UTC(seasonStart.getUTCFullYear() + 1, 2, 31, 23, 59, 59));
+
+  return {
+    by_species: by_species,
+    total: total,
+    season_start: seasonStart.toISOString(),
+    season_end: seasonEnd.toISOString(),
+    daily: daily,
+  };
 }
 
 function history_(params) {

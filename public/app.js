@@ -613,6 +613,7 @@ async function openStrecke() {
       li.appendChild(count);
       list.appendChild(li);
     }
+    renderTimeline(data);
   } catch (err) {
     totalEl.textContent = "—";
     showToast("Strecke konnte nicht geladen werden", "error", 4000);
@@ -623,6 +624,64 @@ async function openStrecke() {
 function closeStrecke() {
   $("#strecke-modal").hidden = true;
   $("#strecke-backdrop").hidden = true;
+}
+
+// Cumulative-count sparkline across the full Apr 1 → Mar 31 season.
+// Steeper segments = peak weeks. A vertical line marks "today" so the
+// season's progress is obvious at a glance.
+function renderTimeline(data) {
+  const wrap = $("#strecke-timeline");
+  const svg = $("#timeline-svg");
+  const todayLbl = $("#timeline-today");
+  if (!data.season_start || !data.season_end) {
+    wrap.hidden = true;
+    return;
+  }
+  const startMs = new Date(data.season_start).getTime();
+  const endMs = new Date(data.season_end).getTime();
+  const span = Math.max(endMs - startMs, 1);
+  const W = 320, H = 60, PAD_X = 4, PAD_Y = 4;
+  const usableW = W - 2 * PAD_X;
+  const usableH = H - 2 * PAD_Y;
+
+  const daily = Array.isArray(data.daily) ? data.daily : [];
+  const totalCum = daily.reduce((s, d) => s + (d.count || 0), 0);
+  const yMax = Math.max(totalCum, 1);
+
+  // Build a stepped path: horizontal until the next harvest day, then
+  // vertical jump up by that day's count.
+  let cum = 0;
+  const segs = [`M ${PAD_X} ${H - PAD_Y}`];
+  for (const d of daily) {
+    const dayMs = new Date(d.day).getTime();
+    if (isNaN(dayMs)) continue;
+    const x = PAD_X + ((dayMs - startMs) / span) * usableW;
+    const yPrev = H - PAD_Y - (cum / yMax) * usableH;
+    segs.push(`L ${x.toFixed(1)} ${yPrev.toFixed(1)}`);
+    cum += d.count || 0;
+    const yNew = H - PAD_Y - (cum / yMax) * usableH;
+    segs.push(`L ${x.toFixed(1)} ${yNew.toFixed(1)}`);
+  }
+  segs.push(`L ${(W - PAD_X).toFixed(1)} ${(H - PAD_Y - (cum / yMax) * usableH).toFixed(1)}`);
+
+  // "Today" vertical line
+  const nowMs = Date.now();
+  const todayX =
+    nowMs >= startMs && nowMs <= endMs
+      ? PAD_X + ((nowMs - startMs) / span) * usableW
+      : null;
+  todayLbl.textContent = todayX != null
+    ? `Heute: ${new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short" }).format(new Date(nowMs))}`
+    : "";
+
+  svg.innerHTML =
+    `<line x1="${PAD_X}" y1="${H - PAD_Y}" x2="${W - PAD_X}" y2="${H - PAD_Y}" stroke="#d8d4c8" stroke-width="0.5"/>` +
+    (todayX != null
+      ? `<line x1="${todayX.toFixed(1)}" y1="${PAD_Y}" x2="${todayX.toFixed(1)}" y2="${H - PAD_Y}" stroke="#b94a2c" stroke-width="0.6" stroke-dasharray="2 2"/>`
+      : "") +
+    `<path d="${segs.join(" ")}" fill="none" stroke="#1f3a1f" stroke-width="1.5" stroke-linejoin="round"/>`;
+
+  wrap.hidden = false;
 }
 
 let toastTimer = null;
