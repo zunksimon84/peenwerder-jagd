@@ -162,16 +162,22 @@ let HeatmapOverlayClass = null;
 
 const HEAT_GRADIENT = (() => {
   // 256-entry RGBA lookup: index = density (0-255), value = [r,g,b,a].
-  // Calibration: intensity 0.2 = pure blue (1 harvest), 0.4 = green
-  // (2), 0.6 = yellow (3), 0.8 = orange (4), 1.0 = red (5+).
+  // Calibration with intensity = weight / 20:
+  //  1 harvest  → 0.05 → BLUE
+  //  4 harvests → 0.20 → GREEN
+  // 10 harvests → 0.50 → YELLOW
+  // 15 harvests → 0.75 → ORANGE
+  // 20 harvests → 1.00 → RED
+  // Smooth interpolation between stops gives every count 1-20 a slightly
+  // different color so each additional harvest visibly nudges the blob.
   const stops = [
-    [0.00, [44, 123, 182, 0]],     // transparent
-    [0.06, [44, 123, 182, 140]],   // fade-in
-    [0.20, [44, 123, 182, 210]],   // BLUE   (1 harvest)
-    [0.40, [102, 189, 99, 225]],   // GREEN  (2 harvests)
-    [0.60, [253, 219, 90, 240]],   // YELLOW (3)
-    [0.80, [253, 141, 60, 250]],   // ORANGE (4)
-    [1.00, [215, 25, 28, 255]],    // RED    (5+)
+    [0.00, [44, 123, 182, 0]],
+    [0.02, [44, 123, 182, 130]],   // fade-in along blob edges
+    [0.05, [44, 123, 182, 205]],   // BLUE   (1 harvest)
+    [0.20, [102, 189, 99, 220]],   // GREEN  (4 harvests)
+    [0.50, [253, 219, 90, 235]],   // YELLOW (10)
+    [0.75, [253, 141, 60, 248]],   // ORANGE (15)
+    [1.00, [215, 25, 28, 255]],    // RED    (20+)
   ];
   const lut = new Uint8ClampedArray(256 * 4);
   for (let i = 0; i < 256; i++) {
@@ -254,10 +260,11 @@ function defineHeatmapOverlay() {
         const x = px.x - left;
         const y = px.y - top;
         if (x < -radius || y < -radius || x > w + radius || y > h + radius) continue;
-        // 1 harvest = 0.2 intensity (blue), 2 = 0.4 (green), 3 = 0.6
-        // (yellow), 4 = 0.8 (orange), 5+ = 1.0 (red). Each harvest visibly
-        // bumps the color one stage.
-        const intensity = Math.min(1, p.weight / 5);
+        // weight / 20: max-red anchor at 20 harvests (a season's worth at
+        // a top-tier Kanzel). Color stops are placed at non-uniform
+        // density values so 1 harvest is already clearly blue and each
+        // additional one visibly nudges the gradient warmer.
+        const intensity = Math.min(1, p.weight / 20);
         const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
         grad.addColorStop(0, `rgba(0,0,0,${intensity})`);
         grad.addColorStop(1, "rgba(0,0,0,0)");
