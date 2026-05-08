@@ -207,6 +207,16 @@ body {
   color: #fff;
 }
 
+.mode-btn.active[data-mode="klettersitz"] {
+  background: #03a9f4;
+  color: #fff;
+}
+
+.mode-btn.active[data-mode="pirsch"] {
+  background: #fdd835;
+  color: #1f1f1f;
+}
+
 /* Scoped to #harvest-form so we win the specificity battle against
    `#harvest-form label { display: flex }` — without this, post-mode and
    free-mode <label>s were always visible regardless of toggle state. */

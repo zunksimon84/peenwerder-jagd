@@ -98,10 +98,12 @@ const AREA_COLOR = {
   Nord: "#ef6c00",
   Nordrand: "#6a1b9a",
   Klettersitz: "#03a9f4", // bright blue — hunter-created mobile climber stands
-  Pirsch: "#c2185b", // magenta — hunter-created stalking locations
+  Pirsch: "#fdd835", // yellow — hunter-created stalking locations
 };
 
 const FREE_AREAS = new Set(["Klettersitz", "Pirsch"]);
+
+const MARKER_SCALE = { Pirsch: 3, Klettersitz: 4 }; // default 5 for fixed Kanzeln
 
 function addMarkerForPost(post) {
   if (state.markers.has(post.id)) return;
@@ -117,7 +119,7 @@ function addMarkerForPost(post) {
       fillOpacity: isFree ? 0.7 : 0.9,
       strokeColor: "#fff",
       strokeWeight: isFree ? 1 : 1.5,
-      scale: isFree ? 4 : 5,
+      scale: MARKER_SCALE[post.area] || 5,
     },
   });
   marker.addListener("click", () => openSheet(post.id));
