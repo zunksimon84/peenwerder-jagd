@@ -98,12 +98,15 @@ const AREA_COLOR = {
   Nord: "#ef6c00",
   Nordrand: "#6a1b9a",
   Klettersitz: "#03a9f4", // bright blue — hunter-created mobile climber stands
+  Pirsch: "#c2185b", // magenta — hunter-created stalking locations
 };
+
+const FREE_AREAS = new Set(["Klettersitz", "Pirsch"]);
 
 function addMarkerForPost(post) {
   if (state.markers.has(post.id)) return;
   if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) return;
-  const isFree = post.area === "Klettersitz";
+  const isFree = FREE_AREAS.has(post.area);
   const marker = new google.maps.Marker({
     position: { lat: post.lat, lng: post.lng },
     map: state.map,
@@ -220,20 +223,23 @@ function rangeToDates(range) {
 
 function setSheetMode(mode) {
   state.sheetMode = mode;
+  // Modes Klettersitz/Pirsch share the same coord-input UI (they only
+  // differ in what gets stored on submit), so map both to "coords".
+  const displayGroup = mode === "post" ? "post" : "coords";
   document.querySelectorAll(".mode-btn").forEach((b) => {
     const active = b.dataset.mode === mode;
     b.classList.toggle("active", active);
     b.setAttribute("aria-selected", active ? "true" : "false");
   });
   document.querySelectorAll("[data-mode-show]").forEach((el) => {
-    el.classList.toggle("visible", el.dataset.modeShow === mode);
+    el.classList.toggle("visible", el.dataset.modeShow === displayGroup);
   });
-  // History only makes sense for an existing post; Klettersitz mode is for
+  // History only makes sense for an existing post; coord modes are for
   // creating a brand-new location, so hide it.
-  if (mode === "free") {
-    $("#history").hidden = true;
-  } else {
+  if (mode === "post") {
     loadHistory($("#f-post").value);
+  } else {
+    $("#history").hidden = true;
   }
 }
 
@@ -369,7 +375,11 @@ async function submitHarvest(ev) {
     };
     if (!body.hunter || body.hunter === "__new__") throw new Error("Bitte Jäger wählen");
     if (body.hunter.length > 40) throw new Error("Name zu lang (max 40)");
-    if (state.sheetMode === "free") {
+    if (state.sheetMode === "post") {
+      body.post_id = $("#f-post").value;
+      if (!body.post_id) throw new Error("Bitte Kanzel auswählen");
+    } else {
+      // Klettersitz or Pirsch — same coord inputs, kind decides storage.
       const latStr = $("#f-free-lat").value.trim();
       const lngStr = $("#f-free-lng").value.trim();
       if (!latStr || !lngStr) {
@@ -383,10 +393,12 @@ async function submitHarvest(ev) {
       if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
         throw new Error("Längengrad muss zwischen −180 und 180 liegen");
       }
-      body.free_location = { lat, lng, label: $("#f-free-label").value.trim() };
-    } else {
-      body.post_id = $("#f-post").value;
-      if (!body.post_id) throw new Error("Bitte Kanzel auswählen");
+      body.free_location = {
+        lat,
+        lng,
+        label: $("#f-free-label").value.trim(),
+        kind: state.sheetMode, // "klettersitz" or "pirsch"
+      };
     }
     localStorage.setItem("peenwerder.hunter", body.hunter);
 
@@ -485,8 +497,8 @@ function wireUi() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        // Skip Klettersitz posts when picking the nearest fixed Kanzel.
-        const p = nearestPost(pos.coords.latitude, pos.coords.longitude, (x) => x.area !== "Klettersitz");
+        // Skip free-coord posts when picking the nearest fixed Kanzel.
+        const p = nearestPost(pos.coords.latitude, pos.coords.longitude, (x) => !FREE_AREAS.has(x.area));
         if (p) {
           $("#f-post").value = p.id;
           showToast(`Nächste: ${p.name}`);

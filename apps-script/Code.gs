@@ -130,8 +130,8 @@ function logHarvest_(body) {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // If a free location was provided (Klettersitz), materialise it as a
-  // Klettersitz-area post so it shows up in aggregates/heatmap like any other.
+  // If a free location was provided (Klettersitz or Pirsch), materialise
+  // it as a post so it shows up in aggregates/heatmap like any other.
   let createdPost = null;
   if (free && !post_id) {
     const lat = Number(free.lat);
@@ -143,11 +143,18 @@ function logHarvest_(body) {
     if (rawLabel && !/^[\p{L}\p{N}][\p{L}\p{N}\s.\-_/'"]{0,39}$/u.test(rawLabel)) {
       return { error: "free_location.label has invalid characters" };
     }
-    const niceLabel = rawLabel || ("Klettersitz " + lat.toFixed(4) + ", " + lng.toFixed(4));
-    post_id = "KS-" + Date.now().toString(36).toUpperCase();
+    const KIND = {
+      klettersitz: { area: "Klettersitz", prefix: "KS-" },
+      pirsch:      { area: "Pirsch",      prefix: "P-"  },
+    };
+    const kindKey = String(free.kind || "klettersitz").toLowerCase();
+    const cfg = KIND[kindKey];
+    if (!cfg) return { error: "invalid free_location.kind" };
+    const niceLabel = rawLabel || (cfg.area + " " + lat.toFixed(4) + ", " + lng.toFixed(4));
+    post_id = cfg.prefix + Date.now().toString(36).toUpperCase();
     const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
-    sheet.appendRow([post_id, niceLabel, "Klettersitz", lat, lng]);
-    createdPost = { id: post_id, name: niceLabel, area: "Klettersitz", lat: lat, lng: lng };
+    sheet.appendRow([post_id, niceLabel, cfg.area, lat, lng]);
+    createdPost = { id: post_id, name: niceLabel, area: cfg.area, lat: lat, lng: lng };
   }
 
   const posts = readPosts_();
