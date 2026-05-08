@@ -161,15 +161,17 @@ function renderMarkers() {
 let HeatmapOverlayClass = null;
 
 const HEAT_GRADIENT = (() => {
-  // 256-entry RGBA lookup: index = density (0-255), value = [r,g,b,a]
+  // 256-entry RGBA lookup: index = density (0-255), value = [r,g,b,a].
+  // Calibration: intensity 0.2 = pure blue (1 harvest), 0.4 = green
+  // (2), 0.6 = yellow (3), 0.8 = orange (4), 1.0 = red (5+).
   const stops = [
-    [0.00, [44, 123, 182, 0]],
-    [0.10, [44, 123, 182, 180]],
-    [0.30, [171, 217, 233, 200]],
-    [0.50, [255, 255, 191, 220]],
-    [0.70, [253, 174, 97, 235]],
-    [0.90, [215, 25, 28, 245]],
-    [1.00, [165, 0, 38, 255]],
+    [0.00, [44, 123, 182, 0]],     // transparent
+    [0.06, [44, 123, 182, 140]],   // fade-in
+    [0.20, [44, 123, 182, 210]],   // BLUE   (1 harvest)
+    [0.40, [102, 189, 99, 225]],   // GREEN  (2 harvests)
+    [0.60, [253, 219, 90, 240]],   // YELLOW (3)
+    [0.80, [253, 141, 60, 250]],   // ORANGE (4)
+    [1.00, [215, 25, 28, 255]],    // RED    (5+)
   ];
   const lut = new Uint8ClampedArray(256 * 4);
   for (let i = 0; i < 256; i++) {
@@ -252,9 +254,12 @@ function defineHeatmapOverlay() {
         const x = px.x - left;
         const y = px.y - top;
         if (x < -radius || y < -radius || x > w + radius || y > h + radius) continue;
-        const intensity = Math.min(1, p.weight / 20); // 1 harvest=0.1, 20=1.0
+        // 1 harvest = 0.2 intensity (blue), 2 = 0.4 (green), 3 = 0.6
+        // (yellow), 4 = 0.8 (orange), 5+ = 1.0 (red). Each harvest visibly
+        // bumps the color one stage.
+        const intensity = Math.min(1, p.weight / 5);
         const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
-        grad.addColorStop(0, `rgba(0,0,0,${0.85 * intensity})`);
+        grad.addColorStop(0, `rgba(0,0,0,${intensity})`);
         grad.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = grad;
         ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
@@ -298,8 +303,9 @@ function renderHeatmap() {
     const count = state.aggregates.get(post.id) || 0;
     if (count <= 0) continue;
     if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) continue;
-    // Floor to 2 so a single harvest is still visible. 2+ stays linear.
-    points.push({ lat: post.lat, lng: post.lng, weight: Math.max(count, 2) });
+    // Use the raw count — the new color ramp is bright enough at
+    // intensity = 1/5 that a single harvest already shows clearly.
+    points.push({ lat: post.lat, lng: post.lng, weight: count });
   }
   if (state.heatOverlay) state.heatOverlay.setPoints(points);
   renderLeaderboard();
