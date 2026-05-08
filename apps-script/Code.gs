@@ -105,8 +105,8 @@ function logHarvest_(body) {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // If a free location was provided (Ansitzbaum), materialise it as a
-  // Frei-area post so it shows up in aggregates/heatmap like any other.
+  // If a free location was provided (Klettersitz), materialise it as a
+  // Klettersitz-area post so it shows up in aggregates/heatmap like any other.
   let createdPost = null;
   if (free && !post_id) {
     const lat = Number(free.lat);
@@ -118,11 +118,11 @@ function logHarvest_(body) {
     if (rawLabel && !/^[\p{L}\p{N}][\p{L}\p{N}\s.\-_/'"]{0,39}$/u.test(rawLabel)) {
       return { error: "free_location.label has invalid characters" };
     }
-    const niceLabel = rawLabel || ("Ansitz " + lat.toFixed(4) + ", " + lng.toFixed(4));
-    post_id = "FREE-" + Date.now().toString(36).toUpperCase();
+    const niceLabel = rawLabel || ("Klettersitz " + lat.toFixed(4) + ", " + lng.toFixed(4));
+    post_id = "KS-" + Date.now().toString(36).toUpperCase();
     const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
-    sheet.appendRow([post_id, niceLabel, "Frei", lat, lng]);
-    createdPost = { id: post_id, name: niceLabel, area: "Frei", lat: lat, lng: lng };
+    sheet.appendRow([post_id, niceLabel, "Klettersitz", lat, lng]);
+    createdPost = { id: post_id, name: niceLabel, area: "Klettersitz", lat: lat, lng: lng };
   }
 
   const posts = readPosts_();
@@ -200,7 +200,9 @@ function ensureSheet_(ss, name, header) {
 // matching "Nr. X" / "DJB X" inside the four known sub-revier folders into
 // the posts tab. New posts are appended; existing ones are updated in
 // place if their name/area/coords changed in My Maps. Posts are never
-// deleted from the sheet (they carry harvest history).
+// deleted from the sheet (they carry harvest history). Klettersitz posts
+// (hunter-created free locations) are independent of KML and never
+// touched by sync.
 
 const KML_URL = "https://www.google.com/maps/d/kml?mid=1Mz4DY_G8uTFDT14YNepjb8vLbjwF6lM&forcekml=1";
 

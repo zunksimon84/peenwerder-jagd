@@ -207,11 +207,14 @@ body {
   color: #fff;
 }
 
-[data-mode-show] {
+/* Scoped to #harvest-form so we win the specificity battle against
+   `#harvest-form label { display: flex }` — without this, post-mode and
+   free-mode <label>s were always visible regardless of toggle state. */
+#harvest-form [data-mode-show] {
   display: none;
 }
 
-[data-mode-show].visible {
+#harvest-form [data-mode-show].visible {
   display: flex;
 }
 

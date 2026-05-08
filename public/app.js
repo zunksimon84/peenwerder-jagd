@@ -97,12 +97,12 @@ const AREA_COLOR = {
   Ost: "#1565c0",
   Nord: "#ef6c00",
   Nordrand: "#6a1b9a",
-  Frei: "#8d6e63", // brown — ad-hoc tree-stand locations
+  Klettersitz: "#8d6e63", // brown — hunter-created mobile climber stands
 };
 
 function addMarkerForPost(post) {
   if (state.markers.has(post.id)) return;
-  const isFree = post.area === "Frei";
+  const isFree = post.area === "Klettersitz";
   const marker = new google.maps.Marker({
     position: { lat: post.lat, lng: post.lng },
     map: state.map,
@@ -259,7 +259,7 @@ function openSheet(postId) {
   $("#f-free-label").value = "";
   $("#f-free-lat").value = "";
   $("#f-free-lng").value = "";
-  setSheetMode("post"); // Ansitzbaum is opt-in via the toggle.
+  setSheetMode("post"); // Klettersitz is opt-in via the toggle.
   $("#sheet").hidden = false;
   $("#sheet-backdrop").hidden = false;
 }
@@ -309,7 +309,7 @@ async function submitHarvest(ev) {
       state.hunters.push(canonical);
       state.hunters.sort((a, b) => a.localeCompare(b, "de"));
     }
-    // If the backend created a Frei post, surface it on the map immediately.
+    // If the backend created a Klettersitz post, surface it on the map immediately.
     if (data.post && !state.posts.some((p) => p.id === data.post.id)) {
       state.posts.push(data.post);
       addMarkerForPost(data.post);
@@ -390,8 +390,8 @@ function wireUi() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        // Skip Frei posts when picking the nearest fixed Kanzel.
-        const p = nearestPost(pos.coords.latitude, pos.coords.longitude, (x) => x.area !== "Frei");
+        // Skip Klettersitz posts when picking the nearest fixed Kanzel.
+        const p = nearestPost(pos.coords.latitude, pos.coords.longitude, (x) => x.area !== "Klettersitz");
         if (p) {
           $("#f-post").value = p.id;
           showToast(`Nächste: ${p.name}`);
