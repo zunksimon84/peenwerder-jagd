@@ -23,6 +23,7 @@
           <option value="7d">7 Tage</option>
           <option value="today">Heute</option>
         </select>
+        <button id="strecke-btn" class="filter-btn" type="button">Strecke</button>
       </div>
     </header>
 
@@ -96,6 +97,20 @@
         <h3>Bisherige Strecke</h3>
         <ul id="history-list"></ul>
       </aside>
+    </section>
+
+    <div id="strecke-backdrop" hidden></div>
+    <section id="strecke-modal" hidden aria-modal="true" role="dialog" aria-labelledby="strecke-title">
+      <header>
+        <h2 id="strecke-title">Strecke</h2>
+        <button id="strecke-close" aria-label="Schließen">×</button>
+      </header>
+      <div class="strecke-range muted" id="strecke-range"></div>
+      <div class="strecke-total">
+        <div class="big-number" id="strecke-total">—</div>
+        <div class="muted">Stück gesamt</div>
+      </div>
+      <ul id="strecke-list"></ul>
     </section>
 
     <div id="toast" hidden></div>

@@ -483,6 +483,10 @@ function wireUi() {
   $("#sheet-backdrop").addEventListener("click", closeSheet);
   $("#harvest-form").addEventListener("submit", submitHarvest);
 
+  $("#strecke-btn").addEventListener("click", openStrecke);
+  $("#strecke-close").addEventListener("click", closeStrecke);
+  $("#strecke-backdrop").addEventListener("click", closeStrecke);
+
   document.querySelectorAll(".counter button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const step = Number(btn.dataset.step);
@@ -556,6 +560,70 @@ function wireUi() {
 }
 
 // ---------------- Toast ----------------
+
+// ---------------- Strecke modal ----------------
+
+const RANGE_LABEL = {
+  all: "Gesamt",
+  season: "Diese Saison",
+  "30d": "Letzte 30 Tage",
+  "7d": "Letzte 7 Tage",
+  today: "Heute",
+};
+
+async function openStrecke() {
+  const list = $("#strecke-list");
+  const totalEl = $("#strecke-total");
+  const rangeEl = $("#strecke-range");
+  list.innerHTML = "";
+  totalEl.textContent = "…";
+  rangeEl.textContent = RANGE_LABEL[state.filters.range] || "";
+  $("#strecke-backdrop").hidden = false;
+  $("#strecke-modal").hidden = false;
+  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
+    totalEl.textContent = "—";
+    return;
+  }
+  try {
+    const url = new URL(cfg.APPS_SCRIPT_URL);
+    url.searchParams.set("action", "strecke");
+    const r = rangeToDates(state.filters.range);
+    if (r.from) url.searchParams.set("from", r.from);
+    if (r.to) url.searchParams.set("to", r.to);
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    totalEl.textContent = String(data.total || 0);
+    if (!data.by_species || data.by_species.length === 0) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "Noch keine Strecke in diesem Zeitraum.";
+      list.appendChild(li);
+      return;
+    }
+    for (const row of data.by_species) {
+      const li = document.createElement("li");
+      const name = document.createElement("span");
+      name.textContent = row.species;
+      const count = document.createElement("span");
+      count.className = "count";
+      count.textContent = row.count;
+      li.appendChild(name);
+      li.appendChild(count);
+      list.appendChild(li);
+    }
+  } catch (err) {
+    totalEl.textContent = "—";
+    showToast("Strecke konnte nicht geladen werden", "error", 4000);
+    console.warn(err);
+  }
+}
+
+function closeStrecke() {
+  $("#strecke-modal").hidden = true;
+  $("#strecke-backdrop").hidden = true;
+}
 
 let toastTimer = null;
 function showToast(msg, kind, ms = 2200) {

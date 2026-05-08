@@ -34,6 +34,7 @@ function doGet(e) {
     if (action === "aggregates") return json_(aggregates_(e.parameter || {}));
     if (action === "sync") return json_(syncPostsFromKml());
     if (action === "history") return json_(history_(e.parameter || {}));
+    if (action === "strecke") return json_(strecke_(e.parameter || {}));
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -58,6 +59,32 @@ function bootstrap_() {
     hunters: readHunters_(),
     species: SPECIES.slice(),
   };
+}
+
+function strecke_(params) {
+  const fromIso = params.from || null;
+  const toIso = params.to || null;
+  const from = fromIso ? new Date(fromIso) : null;
+  const to = toIso ? new Date(toIso) : null;
+
+  const rows = readHarvests_();
+  const counts = {};
+  let total = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const ts = new Date(r.timestamp);
+    if (from && ts < from) continue;
+    if (to && ts > to) continue;
+    const sp = String(r.species || "").trim();
+    if (!sp) continue;
+    const n = Number(r.count) || 0;
+    counts[sp] = (counts[sp] || 0) + n;
+    total += n;
+  }
+  const by_species = Object.keys(counts)
+    .map(function (sp) { return { species: sp, count: counts[sp] }; })
+    .sort(function (a, b) { return b.count - a.count; });
+  return { by_species: by_species, total: total };
 }
 
 function history_(params) {
