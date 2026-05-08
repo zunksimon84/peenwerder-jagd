@@ -172,6 +172,76 @@ function ensureSheet_(ss, name, header) {
   return sheet;
 }
 
+// ---------- Season rollover ----------
+// A hunting season runs Apr 1 → Mar 31. archivePastSeasons() moves any
+// harvest rows from earlier seasons into per-season tabs named
+// "harvests_2025-26" etc., leaving only the current season in the main
+// `harvests` tab. The daily trigger installed by setup() runs this every
+// night, so on Apr 1 (and any day after) the rollover happens automatically.
+
+function archivePastSeasons() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { moved: 0 };
+
+  const header = values[0];
+  const currentStart = seasonStartUtc_(new Date());
+
+  const keep = [header];
+  const buckets = {}; // seasonLabel → [rows]
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const ts = new Date(row[0]);
+    if (isNaN(ts) || ts >= currentStart) {
+      keep.push(row);
+      continue;
+    }
+    const label = seasonLabel_(ts);
+    (buckets[label] = buckets[label] || []).push(row);
+  }
+
+  let moved = 0;
+  for (const label in buckets) {
+    const archive = ensureSheet_(ss, SHEETS.harvests + "_" + label, HARVEST_HEADER);
+    const rows = buckets[label];
+    archive.getRange(archive.getLastRow() + 1, 1, rows.length, HARVEST_HEADER.length).setValues(rows);
+    moved += rows.length;
+  }
+
+  if (moved > 0) {
+    sheet.clear();
+    sheet.getRange(1, 1, keep.length, HARVEST_HEADER.length).setValues(keep);
+    sheet.getRange(1, 1, 1, HARVEST_HEADER.length).setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+
+  return { moved: moved };
+}
+
+function seasonStartUtc_(date) {
+  // April 1 of the year the season started in. Months: 0=Jan ... 3=Apr.
+  const y = date.getUTCMonth() < 3 ? date.getUTCFullYear() - 1 : date.getUTCFullYear();
+  return new Date(Date.UTC(y, 3, 1));
+}
+
+function seasonLabel_(date) {
+  const start = seasonStartUtc_(date);
+  const startYear = start.getUTCFullYear();
+  return startYear + "-" + String((startYear + 1) % 100).padStart(2, "0");
+}
+
+function installArchiveTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "archivePastSeasons") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("archivePastSeasons").timeBased().atHour(1).everyDays(1).create();
+}
+
 // ---------- Response helpers ----------
 
 function json_(obj /*, statusCode (advisory only) */) {
@@ -957,5 +1027,10 @@ function setup() {
   postsSheet.getRange(2, 1, rows.length, POST_HEADER.length).setValues(rows);
   ensureSheet_(ss, SHEETS.hunters, HUNTER_HEADER);
   ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
-  SpreadsheetApp.getUi().alert("Importiert: " + rows.length + " Hochsitze. Trage jetzt im hunters-Tab Namen ein, dann Bereitstellen → Neue Bereitstellung → Web App.");
+  installArchiveTrigger();
+  SpreadsheetApp.getUi().alert(
+    "Importiert: " + rows.length + " Hochsitze.\n" +
+    "Saison-Rollover-Trigger installiert (täglich 01:00).\n\n" +
+    "Trage jetzt im hunters-Tab Namen ein, dann Bereitstellen → Neue Bereitstellung → Web App."
+  );
 }
