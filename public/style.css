@@ -9,6 +9,11 @@
   --accent: #b94a2c;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
+  /* visualViewport-derived browser-chrome insets (set by JS at runtime).
+     iOS Chrome puts its URL bar at the bottom; Safari at the top — these
+     vars let us push fixed modals above whichever bar is in the way. */
+  --vv-top: 0px;
+  --vv-bottom: 0px;
 }
 
 * {
@@ -96,7 +101,7 @@ body {
 #fab {
   position: fixed;
   right: 16px;
-  bottom: calc(16px + var(--safe-bottom));
+  bottom: calc(16px + var(--safe-bottom) + var(--vv-bottom));
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -118,7 +123,7 @@ body {
 #leaderboard {
   position: fixed;
   left: 12px;
-  bottom: calc(12px + var(--safe-bottom));
+  bottom: calc(12px + var(--safe-bottom) + var(--vv-bottom));
   background: var(--card);
   border-radius: 10px;
   padding: 8px 12px;
@@ -172,16 +177,18 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  /* Sit above any bottom browser chrome (iOS Chrome's URL bar). */
+  bottom: var(--vv-bottom);
   z-index: 21;
   background: var(--card);
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   padding: 0 16px calc(16px + var(--safe-bottom));
-  /* svh measures *visible* viewport on iOS — excludes Chrome's URL bar so
-     the modal top doesn't slide under it. vh is the older fallback. */
+  /* Visible-viewport-aware max-height so the top stays below any top
+     browser chrome and bottom stays above any bottom browser chrome. */
   max-height: calc(92vh - var(--safe-top));
   max-height: calc(92svh - var(--safe-top));
+  max-height: calc(100vh - var(--safe-top) - var(--vv-top) - var(--vv-bottom) - 24px);
   overflow-y: auto;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.2s ease-out;
@@ -470,10 +477,11 @@ body {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   left: 12px;
   right: 12px;
-  bottom: calc(12px + var(--safe-bottom));
-  /* svh excludes the iOS Chrome URL bar so the top is always reachable. */
+  /* Sit above bottom browser chrome too. */
+  bottom: calc(12px + var(--safe-bottom) + var(--vv-bottom));
   max-height: calc(85vh - var(--safe-top));
   max-height: calc(85svh - var(--safe-top));
+  max-height: calc(100vh - var(--safe-top) - var(--vv-top) - var(--vv-bottom) - 36px);
   overflow-y: auto;
   animation: slideUp 0.2s ease-out;
 }
@@ -605,7 +613,7 @@ body {
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(80px + var(--safe-bottom));
+  bottom: calc(80px + var(--safe-bottom) + var(--vv-bottom));
   transform: translateX(-50%);
   background: var(--green-dark);
   color: #fff;

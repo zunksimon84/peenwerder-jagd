@@ -21,6 +21,7 @@ const $ = (sel) => document.querySelector(sel);
 // ---------------- Bootstrapping ----------------
 
 async function main() {
+  setupViewportInsets();
   if (!cfg.GOOGLE_MAPS_API_KEY || cfg.GOOGLE_MAPS_API_KEY.startsWith("PASTE")) {
     showToast("Konfiguration fehlt: public/config.js", "error", 8000);
     return;
@@ -36,6 +37,24 @@ async function main() {
     console.error(err);
     showToast("Fehler beim Laden: " + err.message, "error", 6000);
   }
+}
+
+// Track iOS Chrome / Safari URL-bar position so position:fixed modals
+// can sit above (not behind) the browser chrome. CSS env() doesn't expose
+// browser chrome — visualViewport does.
+function setupViewportInsets() {
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const update = () => {
+    const top = Math.max(0, vv.offsetTop);
+    const bottom = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    root.style.setProperty("--vv-top", top + "px");
+    root.style.setProperty("--vv-bottom", bottom + "px");
+  };
+  vv.addEventListener("resize", update);
+  vv.addEventListener("scroll", update);
+  update();
 }
 
 function loadMapsScript(apiKey) {
