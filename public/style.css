@@ -178,8 +178,10 @@ body {
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   padding: 0 16px calc(16px + var(--safe-bottom));
-  /* Cap below the safe-area top so the header is never under the notch. */
+  /* svh measures *visible* viewport on iOS — excludes Chrome's URL bar so
+     the modal top doesn't slide under it. vh is the older fallback. */
   max-height: calc(92vh - var(--safe-top));
+  max-height: calc(92svh - var(--safe-top));
   overflow-y: auto;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.2s ease-out;
@@ -360,6 +362,23 @@ body {
   opacity: 0.5;
 }
 
+.cancel-btn {
+  margin-top: 8px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.cancel-btn:active {
+  background: var(--bg);
+}
+
 .muted {
   color: var(--muted);
   font-weight: normal;
@@ -447,8 +466,9 @@ body {
   left: 12px;
   right: 12px;
   bottom: calc(12px + var(--safe-bottom));
-  /* Cap below the notch so the header (with the × button) is reachable. */
+  /* svh excludes the iOS Chrome URL bar so the top is always reachable. */
   max-height: calc(85vh - var(--safe-top));
+  max-height: calc(85svh - var(--safe-top));
   overflow-y: auto;
   animation: slideUp 0.2s ease-out;
 }

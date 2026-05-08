@@ -504,11 +504,13 @@ function wireUi() {
 
   $("#fab").addEventListener("click", () => openSheet(null));
   $("#sheet-close").addEventListener("click", closeSheet);
+  $("#f-cancel").addEventListener("click", closeSheet);
   $("#sheet-backdrop").addEventListener("click", closeSheet);
   $("#harvest-form").addEventListener("submit", submitHarvest);
 
   $("#strecke-btn").addEventListener("click", openStrecke);
   $("#strecke-close").addEventListener("click", closeStrecke);
+  $("#strecke-close-bottom").addEventListener("click", closeStrecke);
   $("#strecke-backdrop").addEventListener("click", closeStrecke);
 
   document.querySelectorAll(".counter button").forEach((btn) => {
