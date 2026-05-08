@@ -86,36 +86,59 @@ function showGate() {
     const form = $("#gate-form");
     const input = $("#gate-pw");
     const errorEl = $("#gate-error");
+    const submitBtn = form.querySelector("button");
     gate.hidden = false;
     setTimeout(() => input.focus(), 50);
-    form.onsubmit = async (e) => {
-      e.preventDefault();
+
+    let inflight = false;
+    async function attempt() {
+      if (inflight) return;
       const password = input.value;
       if (!password) return;
+      inflight = true;
       errorEl.hidden = true;
-      const submitBtn = form.querySelector("button");
+      const oldText = submitBtn.textContent;
       submitBtn.disabled = true;
+      submitBtn.textContent = "…";
       try {
-        const res = await fetch(
-          cfg.APPS_SCRIPT_URL + "?action=verify-access&password=" + encodeURIComponent(password)
-        );
-        const data = await res.json();
-        if (data.ok && data.token) {
+        const url = cfg.APPS_SCRIPT_URL + "?action=verify-access&password=" + encodeURIComponent(password);
+        const res = await fetch(url, { redirect: "follow" });
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          throw new Error("Antwort vom Server konnte nicht gelesen werden");
+        }
+        if (data && data.ok && data.token) {
           localStorage.setItem("preye.token", data.token);
           gate.hidden = true;
           resolve(true);
+          return;
+        }
+        if (data && data.error) {
+          errorEl.textContent = "Fehler: " + data.error;
         } else {
           errorEl.textContent = "Falsches Passwort.";
-          errorEl.hidden = false;
-          input.select();
         }
+        errorEl.hidden = false;
+        input.select();
       } catch (err) {
+        console.error("gate verify failed", err);
         errorEl.textContent = "Fehler: " + (err.message || err);
         errorEl.hidden = false;
       } finally {
+        inflight = false;
         submitBtn.disabled = false;
+        submitBtn.textContent = oldText;
       }
-    };
+    }
+
+    form.addEventListener("submit", (e) => { e.preventDefault(); attempt(); });
+    submitBtn.addEventListener("click", (e) => { e.preventDefault(); attempt(); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); attempt(); }
+    });
   });
 }
 
