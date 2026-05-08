@@ -136,6 +136,10 @@
     <div id="toast" hidden></div>
 
     <script src="config.js"></script>
+    <!-- deck.gl provides the GPU-accelerated HeatmapLayer via a Google
+         Maps overlay; replaces the deprecated google.maps.visualization
+         HeatmapLayer that's being removed May 2026. -->
+    <script src="https://unpkg.com/deck.gl@9.0.40/dist.min.js"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

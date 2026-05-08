@@ -10,7 +10,7 @@ const state = {
   species: [],
   aggregates: new Map(), // post_id → total_count
   map: null,
-  heatmap: null,
+  deckOverlay: null,     // deck.gl GoogleMapsOverlay (heatmap renderer)
   markers: new Map(),    // post_id → marker
   selectedPostId: null,
   filters: { species: "", range: "season" },
@@ -61,9 +61,9 @@ function loadMapsScript(apiKey) {
   return new Promise((resolve, reject) => {
     if (window.google?.maps) return resolve();
     const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
-      apiKey
-    )}&libraries=visualization&v=weekly`;
+    // No more &libraries=visualization — the bundled HeatmapLayer is
+     // deprecated. We render heat via deck.gl's GoogleMapsOverlay instead.
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async`;
     s.async = true;
     s.defer = true;
     s.onload = () => resolve();
@@ -149,29 +149,45 @@ function renderMarkers() {
   for (const post of state.posts) addMarkerForPost(post);
 }
 
+function ensureDeckOverlay() {
+  if (state.deckOverlay || typeof window.deck === "undefined") return;
+  state.deckOverlay = new window.deck.GoogleMapsOverlay({});
+  state.deckOverlay.setMap(state.map);
+}
+
 function renderHeatmap() {
-  if (state.heatmap) state.heatmap.setMap(null);
+  ensureDeckOverlay();
   const points = [];
   for (const post of state.posts) {
     const count = state.aggregates.get(post.id) || 0;
     if (count <= 0) continue;
     if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) continue;
     points.push({
-      location: new google.maps.LatLng(post.lat, post.lng),
+      lng: post.lng,
+      lat: post.lat,
       // Floor to 2 so a single harvest is still visible. 2+ stays linear.
       weight: Math.max(count, 2),
     });
   }
-  state.heatmap = new google.maps.visualization.HeatmapLayer({
-    data: points,
-    map: state.map,
-    radius: 30,
-    opacity: 0.5,
-    // 20 harvests at one post = full red. Below that ramps linearly:
-    // 5 = 25% intensity, 10 = 50%, 20+ = 100%.
-    maxIntensity: 20,
-    dissipating: true,
-  });
+  if (state.deckOverlay) {
+    const layers = points.length > 0 && window.deck && window.deck.HeatmapLayer
+      ? [
+          new window.deck.HeatmapLayer({
+            id: "harvest-heatmap",
+            data: points,
+            getPosition: (d) => [d.lng, d.lat],
+            getWeight: (d) => d.weight,
+            radiusPixels: 30,
+            intensity: 1,
+            // colorDomain pins the "max red" at weight=20 — same calibration
+            // we had under google.maps.visualization (maxIntensity:20).
+            colorDomain: [0, 20],
+            opacity: 0.55,
+          }),
+        ]
+      : [];
+    state.deckOverlay.setProps({ layers });
+  }
   renderLeaderboard();
 }
 
