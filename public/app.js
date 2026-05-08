@@ -206,6 +206,11 @@ function rangeToDates(range) {
   if (range === "season") return { from: seasonStart(now).toISOString() };
   if (range === "30d") return { from: new Date(now - 30 * 86400000).toISOString() };
   if (range === "7d") return { from: new Date(now - 7 * 86400000).toISOString() };
+  if (range === "today") {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    return { from: startOfDay.toISOString() };
+  }
   return {};
 }
 
