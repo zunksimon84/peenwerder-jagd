@@ -62,8 +62,10 @@ function loadMapsScript(apiKey) {
     if (window.google?.maps) return resolve();
     const s = document.createElement("script");
     // No more &libraries=visualization — the bundled HeatmapLayer is
-     // deprecated. We render heat via deck.gl's GoogleMapsOverlay instead.
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async`;
+    // deprecated. We render heat via deck.gl's GoogleMapsOverlay instead.
+    // Not using loading=async because that switches Maps to importLibrary
+    // mode and our code uses synchronous google.maps.Map / Marker globals.
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
     s.async = true;
     s.defer = true;
     s.onload = () => resolve();
