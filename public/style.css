@@ -335,15 +335,20 @@ body {
 }
 
 .ghost {
-  background: transparent;
-  color: var(--green-mid);
-  border: 1px dashed var(--border);
+  background: #e8e6dd;
+  color: var(--green-dark);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   margin-top: 4px;
   align-self: flex-start;
+}
+
+.ghost:active {
+  background: #ddd9cb;
 }
 
 #f-submit {

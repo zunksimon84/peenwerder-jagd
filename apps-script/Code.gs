@@ -11,6 +11,7 @@ const SPECIES = [
   "Damwild",
   "Fuchs",
   "Dachs",
+  "Waschbär",
   "Hase",
   "Sonstiges",
 ];

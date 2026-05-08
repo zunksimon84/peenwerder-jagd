@@ -459,28 +459,6 @@ async function submitHarvest(ev) {
 
 // ---------------- Geolocation helper ----------------
 
-function nearestPost(lat, lng, predicate) {
-  let best = null;
-  let bestDist = Infinity;
-  for (const p of state.posts) {
-    if (predicate && !predicate(p)) continue;
-    const d = haversine(lat, lng, p.lat, p.lng);
-    if (d < bestDist) { bestDist = d; best = p; }
-  }
-  return best;
-}
-
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = (x) => (x * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
 // ---------------- UI wiring ----------------
 
 function wireUi() {
@@ -520,25 +498,6 @@ function wireUi() {
       const next = Math.max(1, Math.min(20, Number(input.value) + step));
       input.value = String(next);
     });
-  });
-
-  $("#f-nearest").addEventListener("click", () => {
-    if (!navigator.geolocation) {
-      showToast("Standort nicht verfügbar", "error");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        // Skip free-coord posts when picking the nearest fixed Kanzel.
-        const p = nearestPost(pos.coords.latitude, pos.coords.longitude, (x) => !FREE_AREAS.has(x.area));
-        if (p) {
-          $("#f-post").value = p.id;
-          showToast(`Nächste: ${p.name}`);
-        }
-      },
-      (err) => showToast("Standort: " + err.message, "error", 4000),
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
   });
 
   document.querySelectorAll(".mode-btn").forEach((b) => {
