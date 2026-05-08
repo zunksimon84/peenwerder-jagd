@@ -139,6 +139,12 @@ body {
   padding-left: 18px;
 }
 
+#leaderboard .lb-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-dark);
+}
+
 #sheet-backdrop {
   position: fixed;
   inset: 0;
