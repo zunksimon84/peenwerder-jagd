@@ -127,7 +127,8 @@ function renderHeatmap() {
     if (count <= 0) continue;
     points.push({
       location: new google.maps.LatLng(post.lat, post.lng),
-      weight: count,
+      // Floor to 2 so a single harvest is still visible. 2+ stays linear.
+      weight: Math.max(count, 2),
     });
   }
   state.heatmap = new google.maps.visualization.HeatmapLayer({
