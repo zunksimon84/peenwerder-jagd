@@ -654,6 +654,14 @@ body {
   padding: 24px;
 }
 
+/* Higher specificity than #gate alone so the [hidden] attribute actually
+   hides the overlay — without this rule #gate { display: flex } wins
+   against the UA's [hidden] { display: none } and the gate is always
+   visible even in public mode. */
+#gate[hidden] {
+  display: none;
+}
+
 .gate-card {
   background: var(--card);
   padding: 28px 24px;
