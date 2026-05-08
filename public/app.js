@@ -318,6 +318,30 @@ function renderHeatmap() {
   renderLeaderboard();
 }
 
+// Same calibration as the heatmap (max red at 20), but the colors are
+// slightly darkened so the digits stay readable on the leaderboard's
+// white card background. Counts >20 cap at red.
+function countColor(count) {
+  const t = Math.min(1, count / 20);
+  const stops = [
+    [0.05, [25, 95, 160]],    // blue   (1 harvest)
+    [0.20, [76, 160, 76]],    // green  (4)
+    [0.50, [200, 150, 25]],   // amber  (10) — darker than the heatmap yellow
+    [0.75, [220, 110, 30]],   // orange (15)
+    [1.00, [200, 30, 30]],    // red    (20+)
+  ];
+  let lo = stops[0], hi = stops[stops.length - 1];
+  for (let i = 1; i < stops.length; i++) {
+    if (stops[i][0] >= t) { hi = stops[i]; lo = stops[i - 1]; break; }
+  }
+  const span = hi[0] - lo[0] || 1;
+  const f = (t - lo[0]) / span;
+  const r = Math.round(lo[1][0] + (hi[1][0] - lo[1][0]) * f);
+  const g = Math.round(lo[1][1] + (hi[1][1] - lo[1][1]) * f);
+  const b = Math.round(lo[1][2] + (hi[1][2] - lo[1][2]) * f);
+  return `rgb(${r},${g},${b})`;
+}
+
 function renderLeaderboard() {
   const top = [...state.aggregates.entries()]
     .map(([id, n]) => ({ id, n, post: state.posts.find((p) => p.id === id) }))
@@ -331,7 +355,7 @@ function renderLeaderboard() {
     const li = document.createElement("li");
     li.innerHTML =
       `<span class="lb-name">${escapeHtml(r.post.name)}</span>` +
-      `<strong class="lb-count">${r.n}</strong>`;
+      `<strong class="lb-count" style="color:${countColor(r.n)}">${r.n}</strong>`;
     li.style.cursor = "pointer";
     li.addEventListener("click", () => {
       state.map.panTo({ lat: r.post.lat, lng: r.post.lng });
