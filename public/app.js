@@ -97,26 +97,31 @@ const AREA_COLOR = {
   Ost: "#1565c0",
   Nord: "#ef6c00",
   Nordrand: "#6a1b9a",
+  Frei: "#8d6e63", // brown — ad-hoc tree-stand locations
 };
 
+function addMarkerForPost(post) {
+  if (state.markers.has(post.id)) return;
+  const isFree = post.area === "Frei";
+  const marker = new google.maps.Marker({
+    position: { lat: post.lat, lng: post.lng },
+    map: state.map,
+    title: post.name,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      fillColor: AREA_COLOR[post.area] || "#444",
+      fillOpacity: isFree ? 0.7 : 0.9,
+      strokeColor: "#fff",
+      strokeWeight: isFree ? 1 : 1.5,
+      scale: isFree ? 4 : 5,
+    },
+  });
+  marker.addListener("click", () => openSheet(post.id));
+  state.markers.set(post.id, marker);
+}
+
 function renderMarkers() {
-  for (const post of state.posts) {
-    const marker = new google.maps.Marker({
-      position: { lat: post.lat, lng: post.lng },
-      map: state.map,
-      title: post.name,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: AREA_COLOR[post.area] || "#444",
-        fillOpacity: 0.9,
-        strokeColor: "#fff",
-        strokeWeight: 1.5,
-        scale: 5,
-      },
-    });
-    marker.addListener("click", () => openSheet(post.id));
-    state.markers.set(post.id, marker);
-  }
+  for (const post of state.posts) addMarkerForPost(post);
 }
 
 function renderHeatmap() {
@@ -206,6 +211,18 @@ function rangeToDates(range) {
 
 // ---------------- Sheet / form ----------------
 
+function setSheetMode(mode) {
+  state.sheetMode = mode;
+  document.querySelectorAll(".mode-btn").forEach((b) => {
+    const active = b.dataset.mode === mode;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  document.querySelectorAll("[data-mode-show]").forEach((el) => {
+    el.classList.toggle("visible", el.dataset.modeShow === mode);
+  });
+}
+
 function openSheet(postId) {
   state.selectedPostId = postId || null;
   const postSel = $("#f-post");
@@ -239,6 +256,10 @@ function openSheet(postId) {
 
   $("#f-count").value = "1";
   $("#f-notes").value = "";
+  $("#f-free-label").value = "";
+  $("#f-free-lat").value = "";
+  $("#f-free-lng").value = "";
+  setSheetMode("post"); // Ansitzbaum is opt-in via the toggle.
   $("#sheet").hidden = false;
   $("#sheet-backdrop").hidden = false;
 }
@@ -255,13 +276,23 @@ async function submitHarvest(ev) {
   try {
     const body = {
       hunter: $("#f-hunter").value.trim(),
-      post_id: $("#f-post").value,
       species: $("#f-species").value,
       count: Number($("#f-count").value),
       notes: $("#f-notes").value.trim(),
     };
     if (!body.hunter) throw new Error("Bitte Namen eintippen");
     if (body.hunter.length > 40) throw new Error("Name zu lang (max 40)");
+    if (state.sheetMode === "free") {
+      const lat = Number($("#f-free-lat").value);
+      const lng = Number($("#f-free-lng").value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error("Koordinaten ungültig");
+      }
+      body.free_location = { lat, lng, label: $("#f-free-label").value.trim() };
+    } else {
+      body.post_id = $("#f-post").value;
+      if (!body.post_id) throw new Error("Bitte Kanzel auswählen");
+    }
     localStorage.setItem("peenwerder.hunter", body.hunter);
 
     // text/plain keeps this a "simple" CORS request; no preflight needed.
@@ -278,6 +309,11 @@ async function submitHarvest(ev) {
       state.hunters.push(canonical);
       state.hunters.sort((a, b) => a.localeCompare(b, "de"));
     }
+    // If the backend created a Frei post, surface it on the map immediately.
+    if (data.post && !state.posts.some((p) => p.id === data.post.id)) {
+      state.posts.push(data.post);
+      addMarkerForPost(data.post);
+    }
     showToast("Eingetragen ✓");
     closeSheet();
     await refreshAggregates();
@@ -290,10 +326,11 @@ async function submitHarvest(ev) {
 
 // ---------------- Geolocation helper ----------------
 
-function nearestPost(lat, lng) {
+function nearestPost(lat, lng, predicate) {
   let best = null;
   let bestDist = Infinity;
   for (const p of state.posts) {
+    if (predicate && !predicate(p)) continue;
     const d = haversine(lat, lng, p.lat, p.lng);
     if (d < bestDist) { bestDist = d; best = p; }
   }
@@ -353,11 +390,32 @@ function wireUi() {
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const p = nearestPost(pos.coords.latitude, pos.coords.longitude);
+        // Skip Frei posts when picking the nearest fixed Kanzel.
+        const p = nearestPost(pos.coords.latitude, pos.coords.longitude, (x) => x.area !== "Frei");
         if (p) {
           $("#f-post").value = p.id;
           showToast(`Nächste: ${p.name}`);
         }
+      },
+      (err) => showToast("Standort: " + err.message, "error", 4000),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  });
+
+  document.querySelectorAll(".mode-btn").forEach((b) => {
+    b.addEventListener("click", () => setSheetMode(b.dataset.mode));
+  });
+
+  $("#f-free-here").addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      showToast("Standort nicht verfügbar", "error");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        $("#f-free-lat").value = pos.coords.latitude.toFixed(6);
+        $("#f-free-lng").value = pos.coords.longitude.toFixed(6);
+        showToast("Position übernommen");
       },
       (err) => showToast("Standort: " + err.message, "error", 4000),
       { enableHighAccuracy: true, timeout: 8000 }

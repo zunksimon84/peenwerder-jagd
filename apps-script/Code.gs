@@ -83,18 +83,17 @@ function aggregates_(params) {
 
 function logHarvest_(body) {
   const hunter = String(body.hunter || "").trim();
-  const post_id = String(body.post_id || "").trim();
   const speciesVal = String(body.species || "").trim();
   const count = Number(body.count);
   const notes = String(body.notes || "").trim();
+  const free = body.free_location || null;
+  let post_id = String(body.post_id || "").trim();
 
   if (!hunter) return { error: "hunter required" };
   if (hunter.length > 40) return { error: "hunter name too long" };
-  // Allow letters (incl. umlauts), spaces, hyphens, apostrophes, dots.
   if (!/^[\p{L}][\p{L}\s.\-']{0,39}$/u.test(hunter)) {
     return { error: "hunter name has invalid characters" };
   }
-  if (!post_id) return { error: "post_id required" };
   if (!speciesVal) return { error: "species required" };
   if (!Number.isFinite(count) || count < 1 || count > 20) {
     return { error: "count must be 1–20" };
@@ -102,13 +101,34 @@ function logHarvest_(body) {
   if (SPECIES.indexOf(speciesVal) === -1) {
     return { error: "invalid species" };
   }
+  if (!post_id && !free) return { error: "post_id or free_location required" };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // If a free location was provided (Ansitzbaum), materialise it as a
+  // Frei-area post so it shows up in aggregates/heatmap like any other.
+  let createdPost = null;
+  if (free && !post_id) {
+    const lat = Number(free.lat);
+    const lng = Number(free.lng);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) return { error: "free_location.lat out of range" };
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) return { error: "free_location.lng out of range" };
+    const rawLabel = String(free.label || "").trim();
+    if (rawLabel.length > 40) return { error: "free_location.label too long" };
+    if (rawLabel && !/^[\p{L}\p{N}][\p{L}\p{N}\s.\-_/'"]{0,39}$/u.test(rawLabel)) {
+      return { error: "free_location.label has invalid characters" };
+    }
+    const niceLabel = rawLabel || ("Ansitz " + lat.toFixed(4) + ", " + lng.toFixed(4));
+    post_id = "FREE-" + Date.now().toString(36).toUpperCase();
+    const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+    sheet.appendRow([post_id, niceLabel, "Frei", lat, lng]);
+    createdPost = { id: post_id, name: niceLabel, area: "Frei", lat: lat, lng: lng };
+  }
 
   const posts = readPosts_();
   if (!posts.some(function (p) { return p.id === post_id; })) {
     return { error: "unknown post_id: " + post_id };
   }
-
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Auto-add hunter to roster on first use (case-insensitive match).
   const hunters = readHunters_();
@@ -121,7 +141,9 @@ function logHarvest_(body) {
   const sheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
   sheet.appendRow([new Date().toISOString(), canonical, post_id, speciesVal, count, notes]);
 
-  return { ok: true, hunter: canonical };
+  const out = { ok: true, hunter: canonical };
+  if (createdPost) out.post = createdPost;
+  return out;
 }
 
 // ---------- Sheet helpers ----------
