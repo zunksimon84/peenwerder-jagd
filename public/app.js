@@ -127,19 +127,17 @@ function renderHeatmap() {
     if (count <= 0) continue;
     points.push({
       location: new google.maps.LatLng(post.lat, post.lng),
-      // Log scale so a single hot post doesn't drown out everything else.
-      weight: Math.log(count + 1),
+      weight: count,
     });
   }
   state.heatmap = new google.maps.visualization.HeatmapLayer({
     data: points,
     map: state.map,
     radius: 30,
-    opacity: 0.55,
-    // Fix the "max red" anchor so a single early harvest doesn't blow up
-    // to full red. log(count+1) reaches 4 at ~50 harvests, so the gradient
-    // ramps up gradually as data accumulates.
-    maxIntensity: 4,
+    opacity: 0.5,
+    // 20 harvests at one post = full red. Below that ramps linearly:
+    // 5 = 25% intensity, 10 = 50%, 20+ = 100%.
+    maxIntensity: 20,
     dissipating: true,
   });
   renderLeaderboard();
