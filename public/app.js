@@ -153,11 +153,40 @@ function renderMarkers() {
   for (const post of state.posts) addMarkerForPost(post);
 }
 
-// heatmap.js renders into a canvas overlay we mount onto a Google Maps
-// OverlayView. We define the class lazily because it extends
-// google.maps.OverlayView, which only exists after the Maps script loads.
+// Custom canvas-based heatmap overlay. For each post we draw a radial
+// gradient onto a 2D canvas using "lighter" (additive) compositing, then
+// post-process the alpha channel through a color ramp so density maps to
+// the blue → yellow → red gradient. No external library needed.
 
 let HeatmapOverlayClass = null;
+
+const HEAT_GRADIENT = (() => {
+  // 256-entry RGBA lookup: index = density (0-255), value = [r,g,b,a]
+  const stops = [
+    [0.00, [44, 123, 182, 0]],
+    [0.10, [44, 123, 182, 180]],
+    [0.30, [171, 217, 233, 200]],
+    [0.50, [255, 255, 191, 220]],
+    [0.70, [253, 174, 97, 235]],
+    [0.90, [215, 25, 28, 245]],
+    [1.00, [165, 0, 38, 255]],
+  ];
+  const lut = new Uint8ClampedArray(256 * 4);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    let lo = stops[0], hi = stops[stops.length - 1];
+    for (let k = 1; k < stops.length; k++) {
+      if (stops[k][0] >= t) { hi = stops[k]; lo = stops[k - 1]; break; }
+    }
+    const span = hi[0] - lo[0] || 1;
+    const f = (t - lo[0]) / span;
+    lut[i * 4 + 0] = Math.round(lo[1][0] + (hi[1][0] - lo[1][0]) * f);
+    lut[i * 4 + 1] = Math.round(lo[1][1] + (hi[1][1] - lo[1][1]) * f);
+    lut[i * 4 + 2] = Math.round(lo[1][2] + (hi[1][2] - lo[1][2]) * f);
+    lut[i * 4 + 3] = Math.round(lo[1][3] + (hi[1][3] - lo[1][3]) * f);
+  }
+  return lut;
+})();
 
 function defineHeatmapOverlay() {
   if (HeatmapOverlayClass) return HeatmapOverlayClass;
@@ -166,39 +195,27 @@ function defineHeatmapOverlay() {
       super();
       this._points = [];
       this._canvas = null;
-      this._heat = null;
+      this._ctx = null;
     }
     onAdd() {
       const canvas = document.createElement("canvas");
       canvas.style.position = "absolute";
       canvas.style.pointerEvents = "none";
-      canvas.style.opacity = "0.65";
+      canvas.style.left = "0";
+      canvas.style.top = "0";
       this._canvas = canvas;
+      this._ctx = canvas.getContext("2d");
       this.getPanes().overlayLayer.appendChild(canvas);
-      this._heat = window.h337.create({
-        container: canvas,
-        radius: 35,
-        maxOpacity: 0.85,
-        minOpacity: 0,
-        blur: 0.85,
-        gradient: {
-          0.1: "#2c7bb6",
-          0.3: "#abd9e9",
-          0.5: "#ffffbf",
-          0.7: "#fdae61",
-          0.9: "#d7191c",
-        },
-      });
     }
     onRemove() {
       if (this._canvas && this._canvas.parentNode) {
         this._canvas.parentNode.removeChild(this._canvas);
       }
       this._canvas = null;
-      this._heat = null;
+      this._ctx = null;
     }
     draw() {
-      if (!this._canvas || !this._heat) return;
+      if (!this._canvas || !this._ctx) return;
       const projection = this.getProjection();
       if (!projection) return;
       const map = this.getMap();
@@ -209,31 +226,58 @@ function defineHeatmapOverlay() {
       const ne = projection.fromLatLngToDivPixel(bounds.getNorthEast());
       const left = Math.min(sw.x, ne.x);
       const top = Math.min(sw.y, ne.y);
-      const width = Math.abs(ne.x - sw.x);
-      const height = Math.abs(sw.y - ne.y);
+      const w = Math.max(1, Math.round(Math.abs(ne.x - sw.x)));
+      const h = Math.max(1, Math.round(Math.abs(sw.y - ne.y)));
 
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       this._canvas.style.left = left + "px";
       this._canvas.style.top = top + "px";
-      this._canvas.style.width = width + "px";
-      this._canvas.style.height = height + "px";
-      this._canvas.width = Math.max(1, Math.round(width));
-      this._canvas.height = Math.max(1, Math.round(height));
+      this._canvas.style.width = w + "px";
+      this._canvas.style.height = h + "px";
+      this._canvas.width = w * dpr;
+      this._canvas.height = h * dpr;
 
-      // Zoom-aware radius — bigger blobs when zoomed in, tighter when out.
+      const ctx = this._ctx;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      // Zoom-aware radius (CSS px); bigger when zoomed in.
       const zoom = map.getZoom() || MAP_ZOOM;
-      const radius = Math.max(14, Math.min(60, Math.round(zoom * 2.6 - 5)));
-      this._heat._renderer.setStyles({ radius: radius });
-      this._heat._config.radius = radius;
+      const radius = Math.max(18, Math.min(80, Math.round(zoom * 3.4 - 12)));
 
-      const data = this._points.map((p) => {
+      // Pass 1: draw alpha-density blobs additively.
+      ctx.globalCompositeOperation = "lighter";
+      for (const p of this._points) {
         const px = projection.fromLatLngToDivPixel(new google.maps.LatLng(p.lat, p.lng));
-        return { x: Math.round(px.x - left), y: Math.round(px.y - top), value: p.weight };
-      });
-      this._heat.setData({ max: 20, data: data });
+        const x = px.x - left;
+        const y = px.y - top;
+        if (x < -radius || y < -radius || x > w + radius || y > h + radius) continue;
+        const intensity = Math.min(1, p.weight / 20); // 1 harvest=0.1, 20=1.0
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        grad.addColorStop(0, `rgba(0,0,0,${0.85 * intensity})`);
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      }
+
+      // Pass 2: color-map alpha through HEAT_GRADIENT lookup.
+      ctx.globalCompositeOperation = "source-over";
+      const img = ctx.getImageData(0, 0, this._canvas.width, this._canvas.height);
+      const data = img.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a === 0) continue;
+        const li = a * 4;
+        data[i] = HEAT_GRADIENT[li];
+        data[i + 1] = HEAT_GRADIENT[li + 1];
+        data[i + 2] = HEAT_GRADIENT[li + 2];
+        data[i + 3] = HEAT_GRADIENT[li + 3];
+      }
+      ctx.putImageData(img, 0, 0);
     }
     setPoints(points) {
       this._points = points;
-      if (this._canvas && this._heat) this.draw();
+      if (this._canvas) this.draw();
     }
   };
   return HeatmapOverlayClass;
@@ -241,7 +285,7 @@ function defineHeatmapOverlay() {
 
 function ensureHeatOverlay() {
   if (state.heatOverlay) return;
-  if (!window.h337 || !window.google || !window.google.maps) return;
+  if (!window.google || !window.google.maps) return;
   const Cls = defineHeatmapOverlay();
   state.heatOverlay = new Cls();
   state.heatOverlay.setMap(state.map);
