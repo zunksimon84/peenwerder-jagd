@@ -102,6 +102,7 @@ const AREA_COLOR = {
 
 function addMarkerForPost(post) {
   if (state.markers.has(post.id)) return;
+  if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) return;
   const isFree = post.area === "Klettersitz";
   const marker = new google.maps.Marker({
     position: { lat: post.lat, lng: post.lng },
@@ -130,6 +131,7 @@ function renderHeatmap() {
   for (const post of state.posts) {
     const count = state.aggregates.get(post.id) || 0;
     if (count <= 0) continue;
+    if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) continue;
     points.push({
       location: new google.maps.LatLng(post.lat, post.lng),
       // Floor to 2 so a single harvest is still visible. 2+ stays linear.
@@ -304,10 +306,18 @@ async function submitHarvest(ev) {
     if (!body.hunter || body.hunter === "__new__") throw new Error("Bitte Jäger wählen");
     if (body.hunter.length > 40) throw new Error("Name zu lang (max 40)");
     if (state.sheetMode === "free") {
-      const lat = Number($("#f-free-lat").value);
-      const lng = Number($("#f-free-lng").value);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        throw new Error("Koordinaten ungültig");
+      const latStr = $("#f-free-lat").value.trim();
+      const lngStr = $("#f-free-lng").value.trim();
+      if (!latStr || !lngStr) {
+        throw new Error("Bitte Koordinaten eingeben oder 'Aktuelle Position' nutzen");
+      }
+      const lat = Number(latStr);
+      const lng = Number(lngStr);
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+        throw new Error("Breitengrad muss zwischen −90 und 90 liegen");
+      }
+      if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+        throw new Error("Längengrad muss zwischen −180 und 180 liegen");
       }
       body.free_location = { lat, lng, label: $("#f-free-label").value.trim() };
     } else {
