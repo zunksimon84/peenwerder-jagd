@@ -235,15 +235,31 @@ function openSheet(postId) {
     postSel.appendChild(opt);
   }
 
-  const hunterInput = $("#f-hunter");
-  const hunterList = $("#hunters-datalist");
-  hunterList.innerHTML = "";
+  const hunterSel = $("#f-hunter");
+  hunterSel.innerHTML = "";
+  const last = localStorage.getItem("peenwerder.hunter");
   for (const h of state.hunters) {
     const opt = document.createElement("option");
     opt.value = h;
-    hunterList.appendChild(opt);
+    opt.textContent = h;
+    if (h === last) opt.selected = true;
+    hunterSel.appendChild(opt);
   }
-  hunterInput.value = localStorage.getItem("peenwerder.hunter") || "";
+  if (state.hunters.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.disabled = true;
+    opt.selected = true;
+    opt.textContent = "— bitte Namen anlegen —";
+    hunterSel.appendChild(opt);
+  }
+  // "+ Neuer Jäger…" entry — picking it prompts for a fresh name, which
+  // gets added as a temporary option and selected. The backend will
+  // persist it to the hunters tab on first successful submit.
+  const newOpt = document.createElement("option");
+  newOpt.value = "__new__";
+  newOpt.textContent = "+ Neuer Jäger…";
+  hunterSel.appendChild(newOpt);
 
   const speciesSel = $("#f-species");
   speciesSel.innerHTML = "";
@@ -280,7 +296,7 @@ async function submitHarvest(ev) {
       count: Number($("#f-count").value),
       notes: $("#f-notes").value.trim(),
     };
-    if (!body.hunter) throw new Error("Bitte Namen eintippen");
+    if (!body.hunter || body.hunter === "__new__") throw new Error("Bitte Jäger wählen");
     if (body.hunter.length > 40) throw new Error("Name zu lang (max 40)");
     if (state.sheetMode === "free") {
       const lat = Number($("#f-free-lat").value);
@@ -404,6 +420,25 @@ function wireUi() {
 
   document.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => setSheetMode(b.dataset.mode));
+  });
+
+  $("#f-hunter").addEventListener("change", (e) => {
+    if (e.target.value !== "__new__") return;
+    const raw = (window.prompt("Name des neuen Jägers:") || "").trim();
+    const valid = /^[\p{L}][\p{L}\s.\-']{0,39}$/u.test(raw);
+    if (!valid) {
+      // Bail back to the previously stored name (or the first real option).
+      const last = localStorage.getItem("peenwerder.hunter") || "";
+      e.target.value = state.hunters.includes(last) ? last : (state.hunters[0] || "");
+      if (raw) showToast("Name ungültig (nur Buchstaben, max 40)", "error", 3000);
+      return;
+    }
+    // Insert as a real option above "+ Neuer Jäger…" and select it.
+    const opt = document.createElement("option");
+    opt.value = raw;
+    opt.textContent = raw;
+    e.target.insertBefore(opt, e.target.querySelector('option[value="__new__"]'));
+    opt.selected = true;
   });
 
   $("#f-free-here").addEventListener("click", () => {
