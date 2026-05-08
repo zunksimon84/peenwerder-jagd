@@ -97,7 +97,7 @@ const AREA_COLOR = {
   Ost: "#1565c0",
   Nord: "#ef6c00",
   Nordrand: "#6a1b9a",
-  Klettersitz: "#8d6e63", // brown — hunter-created mobile climber stands
+  Klettersitz: "#03a9f4", // bright blue — hunter-created mobile climber stands
 };
 
 function addMarkerForPost(post) {
