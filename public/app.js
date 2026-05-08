@@ -93,7 +93,7 @@ async function bootstrap() {
       if (res.ok) {
         const data = await res.json();
         state.posts = data.posts || [];
-        state.hunters = data.hunters || [];
+        state.hunters = (data.hunters || []).slice().sort((a, b) => a.localeCompare(b, "de"));
         state.species = data.species || [];
         return;
       }
@@ -359,12 +359,13 @@ function openSheet(postId) {
 
   const hunterSel = $("#f-hunter");
   hunterSel.innerHTML = "";
-  const last = localStorage.getItem("peenwerder.hunter");
+  // Always start at the top of the alphabetically-sorted list — no
+  // pre-selection from localStorage so the dropdown opens at "A" each
+  // time, not in the middle on whoever was last logged.
   for (const h of state.hunters) {
     const opt = document.createElement("option");
     opt.value = h;
     opt.textContent = h;
-    if (h === last) opt.selected = true;
     hunterSel.appendChild(opt);
   }
   if (state.hunters.length === 0) {
@@ -445,7 +446,6 @@ async function submitHarvest(ev) {
         kind: state.sheetMode, // "klettersitz" or "pirsch"
       };
     }
-    localStorage.setItem("peenwerder.hunter", body.hunter);
 
     // text/plain keeps this a "simple" CORS request; no preflight needed.
     const res = await fetch(cfg.APPS_SCRIPT_URL, {
@@ -532,9 +532,8 @@ function wireUi() {
     const raw = (window.prompt("Name des neuen Jägers:") || "").trim();
     const valid = /^[\p{L}][\p{L}\s.\-']{0,39}$/u.test(raw);
     if (!valid) {
-      // Bail back to the previously stored name (or the first real option).
-      const last = localStorage.getItem("peenwerder.hunter") || "";
-      e.target.value = state.hunters.includes(last) ? last : (state.hunters[0] || "");
+      // Bail back to the first option in the sorted list.
+      e.target.value = state.hunters[0] || "";
       if (raw) showToast("Name ungültig (nur Buchstaben, max 40)", "error", 3000);
       return;
     }
