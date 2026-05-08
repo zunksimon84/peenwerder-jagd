@@ -61,8 +61,12 @@ body {
 }
 
 .brand-pray {
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  /* Anta only ships a 400 weight; keep weight default and use spacing
+     + the geometric letterforms for visual weight. */
+  font-family: "Anta", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: 1.2px;
+  font-size: 18px;
 }
 
 .brand-eye {
