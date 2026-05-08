@@ -32,6 +32,7 @@ function doGet(e) {
     const action = (e.parameter && e.parameter.action) || "bootstrap";
     if (action === "bootstrap") return json_(bootstrap_());
     if (action === "aggregates") return json_(aggregates_(e.parameter || {}));
+    if (action === "sync") return json_(syncPostsFromKml());
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -170,6 +171,158 @@ function ensureSheet_(ss, name, header) {
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+// ---------- KML sync ----------
+// Re-fetches the public Peenwerder My Map KML and upserts placemarks
+// matching "Nr. X" / "DJB X" inside the four known sub-revier folders into
+// the posts tab. New posts are appended; existing ones are updated in
+// place if their name/area/coords changed in My Maps. Posts are never
+// deleted from the sheet (they carry harvest history).
+
+const KML_URL = "https://www.google.com/maps/d/kml?mid=1Mz4DY_G8uTFDT14YNepjb8vLbjwF6lM&forcekml=1";
+
+const AREA_PREFIX = {
+  "Peenwerder Hauptrevier": "HR",
+  "Peenwerder Ost": "OST",
+  "Peenwerder Nord": "N",
+  "Peenwerder Nordrand": "NR",
+};
+
+function syncPostsFromKml() {
+  const res = UrlFetchApp.fetch(KML_URL, { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) {
+    throw new Error("KML fetch failed: HTTP " + res.getResponseCode());
+  }
+  const fromKml = parseKmlPosts_(res.getContentText());
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+  const lastRow = sheet.getLastRow();
+  const existingValues = lastRow > 1
+    ? sheet.getRange(2, 1, lastRow - 1, POST_HEADER.length).getValues()
+    : [];
+
+  const idToRowIdx = {};
+  for (let i = 0; i < existingValues.length; i++) {
+    idToRowIdx[String(existingValues[i][0])] = i;
+  }
+
+  let added = 0, updated = 0;
+  const newRows = [];
+  for (let i = 0; i < fromKml.length; i++) {
+    const p = fromKml[i];
+    const newRow = [p.id, p.name, p.area, p.lat, p.lng];
+    if (idToRowIdx[p.id] !== undefined) {
+      const cur = existingValues[idToRowIdx[p.id]];
+      const changed =
+        String(cur[1]) !== p.name ||
+        String(cur[2]) !== p.area ||
+        Math.abs(Number(cur[3]) - p.lat) > 1e-7 ||
+        Math.abs(Number(cur[4]) - p.lng) > 1e-7;
+      if (changed) {
+        sheet.getRange(idToRowIdx[p.id] + 2, 1, 1, POST_HEADER.length).setValues([newRow]);
+        updated++;
+      }
+    } else {
+      newRows.push(newRow);
+      added++;
+    }
+  }
+  if (newRows.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, POST_HEADER.length).setValues(newRows);
+  }
+  return { added: added, updated: updated, total: fromKml.length };
+}
+
+function parseKmlPosts_(kml) {
+  const folders = parseKmlFolders_(kml);
+  const out = [];
+  for (let i = 0; i < folders.length; i++) {
+    const folder = folders[i];
+    const prefix = AREA_PREFIX[folder.name];
+    if (!prefix) continue;
+    const placemarks = parseKmlPointPlacemarks_(folder.body);
+    for (let j = 0; j < placemarks.length; j++) {
+      const pm = placemarks[j];
+      if (!isHuntingPostName_(pm.name)) continue;
+      const num = postNumber_(pm.name);
+      if (!num) continue;
+      const isDjb = /^DJB/i.test(pm.name);
+      const idCore = (isDjb ? "DJB" : "") + num;
+      out.push({
+        id: prefix + "-" + idCore.toUpperCase(),
+        name: pm.name,
+        area: folder.name.replace(/^Peenwerder\s+/, ""),
+        lat: pm.lat,
+        lng: pm.lng,
+      });
+    }
+  }
+  // Suffix duplicate IDs so they remain unique (matches parse-kml.mjs).
+  const seen = {};
+  for (let k = 0; k < out.length; k++) {
+    const id = out[k].id;
+    seen[id] = (seen[id] || 0) + 1;
+    if (seen[id] > 1) out[k].id = id + "-" + seen[id];
+  }
+  return out;
+}
+
+function parseKmlFolders_(kml) {
+  const folders = [];
+  const re = /<Folder>([\s\S]*?)<\/Folder>/g;
+  let m;
+  while ((m = re.exec(kml)) !== null) {
+    const body = m[1];
+    const nameMatch = body.match(/<name>([^<]+)<\/name>/);
+    folders.push({
+      name: nameMatch ? decodeXml_(nameMatch[1].trim()) : "Unknown",
+      body: body,
+    });
+  }
+  return folders;
+}
+
+function parseKmlPointPlacemarks_(body) {
+  const out = [];
+  const re = /<Placemark>([\s\S]*?)<\/Placemark>/g;
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    const inner = m[1];
+    if (!/<Point>/.test(inner)) continue;
+    const nameMatch = inner.match(/<name>([\s\S]*?)<\/name>/);
+    const coordMatch = inner.match(/<coordinates>([\s\S]*?)<\/coordinates>/);
+    if (!nameMatch || !coordMatch) continue;
+    const parts = coordMatch[1].trim().split(",").map(Number);
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) continue;
+    out.push({ name: decodeXml_(nameMatch[1].trim()), lat: parts[1], lng: parts[0] });
+  }
+  return out;
+}
+
+function decodeXml_(s) {
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+}
+
+function isHuntingPostName_(name) {
+  return /^(Nr\.?|DJB)\s*\d+/i.test(name);
+}
+
+function postNumber_(name) {
+  const m = name.match(/^(?:Nr\.?|DJB)\s*([\dA-Za-z]+)/i);
+  return m ? m[1] : null;
+}
+
+function installPostsSyncTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "syncPostsFromKml") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("syncPostsFromKml").timeBased().everyHours(1).create();
 }
 
 // ---------- Season rollover ----------
@@ -1027,10 +1180,22 @@ function setup() {
   postsSheet.getRange(2, 1, rows.length, POST_HEADER.length).setValues(rows);
   ensureSheet_(ss, SHEETS.hunters, HUNTER_HEADER);
   ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
+
+  // Catch up on any Kanzeln added in My Maps since the last bake.
+  let syncMsg = "";
+  try {
+    const r = syncPostsFromKml();
+    syncMsg = "\nKML-Sync: " + r.added + " neu, " + r.updated + " aktualisiert.";
+  } catch (err) {
+    syncMsg = "\nKML-Sync hat nicht funktioniert (" + err.message + "), wird stündlich erneut versucht.";
+  }
+
   installArchiveTrigger();
+  installPostsSyncTrigger();
+
   SpreadsheetApp.getUi().alert(
-    "Importiert: " + rows.length + " Hochsitze.\n" +
-    "Saison-Rollover-Trigger installiert (täglich 01:00).\n\n" +
+    "Importiert: " + rows.length + " Hochsitze." + syncMsg + "\n" +
+    "Trigger installiert: Saison-Rollover (01:00 täglich), KML-Sync (stündlich).\n\n" +
     "Trage jetzt im hunters-Tab Namen ein, dann Bereitstellen → Neue Bereitstellung → Web App."
   );
 }
