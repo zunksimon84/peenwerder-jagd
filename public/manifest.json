@@ -1,0 +1,9 @@
+{
+  "name": "Peenwerder Jagd-Heatmap",
+  "short_name": "Peenwerder",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1f3a1f",
+  "theme_color": "#1f3a1f",
+  "icons": []
+}
