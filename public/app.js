@@ -10,7 +10,7 @@ const state = {
   species: [],
   aggregates: new Map(), // post_id → total_count
   map: null,
-  deckOverlay: null,     // deck.gl GoogleMapsOverlay (heatmap renderer)
+  heatOverlay: null,     // heatmap.js OverlayView wrapper
   markers: new Map(),    // post_id → marker
   selectedPostId: null,
   filters: { species: "", range: "season" },
@@ -84,11 +84,8 @@ function initMap() {
     fullscreenControl: false,
     gestureHandling: "greedy",
   });
-  // Re-render the heatmap whenever the user zooms so radiusPixels can
-  // scale with zoom level (smaller blobs when zoomed out).
-  state.map.addListener("zoom_changed", () => {
-    if (state.deckOverlay) renderHeatmap();
-  });
+  // OverlayView.draw() auto-fires on zoom/pan, so the heatmap recomputes
+  // canvas size + zoom-aware radius without us listening explicitly.
 }
 
 async function bootstrap() {
@@ -156,54 +153,111 @@ function renderMarkers() {
   for (const post of state.posts) addMarkerForPost(post);
 }
 
-function ensureDeckOverlay() {
-  if (state.deckOverlay || typeof window.deck === "undefined") return;
-  state.deckOverlay = new window.deck.GoogleMapsOverlay({});
-  state.deckOverlay.setMap(state.map);
+// heatmap.js renders into a canvas overlay we mount onto a Google Maps
+// OverlayView. We define the class lazily because it extends
+// google.maps.OverlayView, which only exists after the Maps script loads.
+
+let HeatmapOverlayClass = null;
+
+function defineHeatmapOverlay() {
+  if (HeatmapOverlayClass) return HeatmapOverlayClass;
+  HeatmapOverlayClass = class extends google.maps.OverlayView {
+    constructor() {
+      super();
+      this._points = [];
+      this._canvas = null;
+      this._heat = null;
+    }
+    onAdd() {
+      const canvas = document.createElement("canvas");
+      canvas.style.position = "absolute";
+      canvas.style.pointerEvents = "none";
+      canvas.style.opacity = "0.65";
+      this._canvas = canvas;
+      this.getPanes().overlayLayer.appendChild(canvas);
+      this._heat = window.h337.create({
+        container: canvas,
+        radius: 35,
+        maxOpacity: 0.85,
+        minOpacity: 0,
+        blur: 0.85,
+        gradient: {
+          0.1: "#2c7bb6",
+          0.3: "#abd9e9",
+          0.5: "#ffffbf",
+          0.7: "#fdae61",
+          0.9: "#d7191c",
+        },
+      });
+    }
+    onRemove() {
+      if (this._canvas && this._canvas.parentNode) {
+        this._canvas.parentNode.removeChild(this._canvas);
+      }
+      this._canvas = null;
+      this._heat = null;
+    }
+    draw() {
+      if (!this._canvas || !this._heat) return;
+      const projection = this.getProjection();
+      if (!projection) return;
+      const map = this.getMap();
+      const bounds = map.getBounds();
+      if (!bounds) return;
+
+      const sw = projection.fromLatLngToDivPixel(bounds.getSouthWest());
+      const ne = projection.fromLatLngToDivPixel(bounds.getNorthEast());
+      const left = Math.min(sw.x, ne.x);
+      const top = Math.min(sw.y, ne.y);
+      const width = Math.abs(ne.x - sw.x);
+      const height = Math.abs(sw.y - ne.y);
+
+      this._canvas.style.left = left + "px";
+      this._canvas.style.top = top + "px";
+      this._canvas.style.width = width + "px";
+      this._canvas.style.height = height + "px";
+      this._canvas.width = Math.max(1, Math.round(width));
+      this._canvas.height = Math.max(1, Math.round(height));
+
+      // Zoom-aware radius — bigger blobs when zoomed in, tighter when out.
+      const zoom = map.getZoom() || MAP_ZOOM;
+      const radius = Math.max(14, Math.min(60, Math.round(zoom * 2.6 - 5)));
+      this._heat._renderer.setStyles({ radius: radius });
+      this._heat._config.radius = radius;
+
+      const data = this._points.map((p) => {
+        const px = projection.fromLatLngToDivPixel(new google.maps.LatLng(p.lat, p.lng));
+        return { x: Math.round(px.x - left), y: Math.round(px.y - top), value: p.weight };
+      });
+      this._heat.setData({ max: 20, data: data });
+    }
+    setPoints(points) {
+      this._points = points;
+      if (this._canvas && this._heat) this.draw();
+    }
+  };
+  return HeatmapOverlayClass;
+}
+
+function ensureHeatOverlay() {
+  if (state.heatOverlay) return;
+  if (!window.h337 || !window.google || !window.google.maps) return;
+  const Cls = defineHeatmapOverlay();
+  state.heatOverlay = new Cls();
+  state.heatOverlay.setMap(state.map);
 }
 
 function renderHeatmap() {
-  ensureDeckOverlay();
+  ensureHeatOverlay();
   const points = [];
   for (const post of state.posts) {
     const count = state.aggregates.get(post.id) || 0;
     if (count <= 0) continue;
     if (!Number.isFinite(post.lat) || !Number.isFinite(post.lng)) continue;
-    points.push({
-      lng: post.lng,
-      lat: post.lat,
-      // Floor to 2 so a single harvest is still visible. 2+ stays linear.
-      weight: Math.max(count, 2),
-    });
+    // Floor to 2 so a single harvest is still visible. 2+ stays linear.
+    points.push({ lat: post.lat, lng: post.lng, weight: Math.max(count, 2) });
   }
-  if (state.deckOverlay) {
-    // Zoom-aware radius — small dots when looking at the whole Revier,
-    // bigger blobs when you zoom into a single Kanzel cluster. Clamped so
-    // it never gets unreadably small/huge.
-    const zoom = state.map.getZoom() || MAP_ZOOM;
-    const radiusPx = Math.max(10, Math.min(38, Math.round(zoom * 1.7 + 1)));
-    const layers = points.length > 0 && window.deck && window.deck.HeatmapLayer
-      ? [
-          new window.deck.HeatmapLayer({
-            id: "harvest-heatmap",
-            data: points,
-            getPosition: (d) => [d.lng, d.lat],
-            getWeight: (d) => d.weight,
-            radiusPixels: radiusPx,
-            intensity: 1,
-            // Smoother fade-out — default 0.05 cuts off too sharply.
-            threshold: 0.02,
-            // Higher-resolution internal texture for sharper edges.
-            weightsTextureSize: 2048,
-            // colorDomain pins the "max red" at weight=20 — same calibration
-            // we had under google.maps.visualization (maxIntensity:20).
-            colorDomain: [0, 20],
-            opacity: 0.6,
-          }),
-        ]
-      : [];
-    state.deckOverlay.setProps({ layers });
-  }
+  if (state.heatOverlay) state.heatOverlay.setPoints(points);
   renderLeaderboard();
 }
 
