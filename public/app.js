@@ -134,8 +134,12 @@ function renderHeatmap() {
   state.heatmap = new google.maps.visualization.HeatmapLayer({
     data: points,
     map: state.map,
-    radius: 35,
-    opacity: 0.7,
+    radius: 30,
+    opacity: 0.55,
+    // Fix the "max red" anchor so a single early harvest doesn't blow up
+    // to full red. log(count+1) reaches 4 at ~50 harvests, so the gradient
+    // ramps up gradually as data accumulates.
+    maxIntensity: 4,
     dissipating: true,
   });
   renderLeaderboard();
