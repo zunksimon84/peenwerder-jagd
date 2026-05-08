@@ -33,6 +33,7 @@ function doGet(e) {
     if (action === "bootstrap") return json_(bootstrap_());
     if (action === "aggregates") return json_(aggregates_(e.parameter || {}));
     if (action === "sync") return json_(syncPostsFromKml());
+    if (action === "history") return json_(history_(e.parameter || {}));
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -57,6 +58,30 @@ function bootstrap_() {
     hunters: readHunters_(),
     species: SPECIES.slice(),
   };
+}
+
+function history_(params) {
+  const post_id = String(params.post_id || "").trim();
+  if (!post_id) return [];
+  const limit = Math.min(Math.max(Number(params.limit) || 20, 1), 100);
+  const rows = readHarvests_();
+  const filtered = rows
+    .filter(function (r) { return String(r.post_id).trim() === post_id; })
+    .map(function (r) {
+      const ts = new Date(r.timestamp);
+      return {
+        timestamp: isNaN(ts) ? null : ts.toISOString(),
+        hunter: String(r.hunter || ""),
+        species: String(r.species || ""),
+        count: Number(r.count) || 0,
+        notes: String(r.notes || ""),
+      };
+    })
+    .sort(function (a, b) {
+      return (b.timestamp || "").localeCompare(a.timestamp || "");
+    })
+    .slice(0, limit);
+  return filtered;
 }
 
 function aggregates_(params) {

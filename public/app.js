@@ -228,6 +228,70 @@ function setSheetMode(mode) {
   document.querySelectorAll("[data-mode-show]").forEach((el) => {
     el.classList.toggle("visible", el.dataset.modeShow === mode);
   });
+  // History only makes sense for an existing post; Klettersitz mode is for
+  // creating a brand-new location, so hide it.
+  if (mode === "free") {
+    $("#history").hidden = true;
+  } else {
+    loadHistory($("#f-post").value);
+  }
+}
+
+const HISTORY_DATE_FMT = new Intl.DateTimeFormat("de-DE", {
+  day: "numeric", month: "short", year: "numeric",
+});
+
+async function loadHistory(postId) {
+  const histEl = $("#history");
+  const listEl = $("#history-list");
+  if (!postId) {
+    histEl.hidden = true;
+    return;
+  }
+  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
+    histEl.hidden = true;
+    return;
+  }
+  // Quick placeholder so the sheet doesn't flicker empty during the fetch.
+  listEl.innerHTML = "";
+  histEl.hidden = false;
+  try {
+    const url = new URL(cfg.APPS_SCRIPT_URL);
+    url.searchParams.set("action", "history");
+    url.searchParams.set("post_id", postId);
+    url.searchParams.set("limit", "20");
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    // Race guard: if the dropdown moved on while we were waiting, drop this.
+    if ($("#f-post").value !== postId || state.sheetMode !== "post") return;
+    listEl.innerHTML = "";
+    if (!Array.isArray(data) || data.length === 0) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "Noch keine Strecke an dieser Stelle.";
+      listEl.appendChild(p);
+      return;
+    }
+    for (const h of data) {
+      const li = document.createElement("li");
+      const when = h.timestamp ? HISTORY_DATE_FMT.format(new Date(h.timestamp)) : "—";
+      li.innerHTML =
+        `<span class="when">${when}</span>` +
+        `<strong>${escapeHtml(h.species)}</strong> ×${h.count}` +
+        ` <span class="who">${escapeHtml(h.hunter)}</span>`;
+      listEl.appendChild(li);
+    }
+  } catch (err) {
+    console.warn("history fetch failed:", err);
+    histEl.hidden = true;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
 }
 
 function openSheet(postId) {
@@ -435,6 +499,10 @@ function wireUi() {
 
   document.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => setSheetMode(b.dataset.mode));
+  });
+
+  $("#f-post").addEventListener("change", (e) => {
+    if (state.sheetMode === "post") loadHistory(e.target.value);
   });
 
   $("#f-hunter").addEventListener("change", (e) => {
