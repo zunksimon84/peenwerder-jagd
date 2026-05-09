@@ -324,6 +324,46 @@ body {
   flex: 1;
 }
 
+.species-extras {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.gender-buttons {
+  display: flex;
+  gap: 4px;
+  align-self: flex-end;
+}
+
+.gender-btn {
+  width: 50px;
+  height: 44px;
+  font-size: 22px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.gender-btn[data-gender="m"].active {
+  background: #1565c0;
+  color: #fff;
+  border-color: #1565c0;
+}
+
+.gender-btn[data-gender="w"].active {
+  background: #c2185b;
+  color: #fff;
+  border-color: #c2185b;
+}
+
+.ak-select {
+  flex: 1;
+}
+
 #harvest-form label {
   display: flex;
   flex-direction: column;

@@ -670,6 +670,8 @@ function openSheet(postId) {
   $("#f-free-label").value = "";
   $("#f-free-lat").value = "";
   $("#f-free-lng").value = "";
+  $("#f-age").value = "";
+  document.querySelectorAll(".gender-btn").forEach((b) => b.classList.remove("active"));
   // Default the date/time picker to "now" in local time. The user can
   // backdate it if they're logging a harvest from yesterday — the
   // backend will use this timestamp for the row + the wind lookup.
@@ -689,11 +691,14 @@ async function submitHarvest(ev) {
   const submitBtn = $("#f-submit");
   submitBtn.disabled = true;
   try {
+    const activeGender = document.querySelector(".gender-btn.active");
     const body = {
       hunter: $("#f-hunter").value.trim(),
       species: $("#f-species").value,
       count: Number($("#f-count").value),
       notes: $("#f-notes").value.trim(),
+      gender: activeGender ? activeGender.dataset.gender : "",
+      age_class: $("#f-age").value,
     };
     const timeStr = $("#f-time").value;
     if (timeStr) {
@@ -808,6 +813,15 @@ function wireUi() {
 
   document.querySelectorAll(".mode-btn").forEach((b) => {
     b.addEventListener("click", () => setSheetMode(b.dataset.mode));
+  });
+
+  // Gender toggle: one or none. Tapping the active one again deselects it.
+  document.querySelectorAll(".gender-btn").forEach((b) => {
+    b.addEventListener("click", () => {
+      const wasActive = b.classList.contains("active");
+      document.querySelectorAll(".gender-btn").forEach((o) => o.classList.remove("active"));
+      if (!wasActive) b.classList.add("active");
+    });
   });
 
   $("#f-post").addEventListener("change", (e) => {

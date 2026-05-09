@@ -107,6 +107,23 @@
           Wildart
           <select id="f-species" required></select>
         </label>
+        <div class="species-extras">
+          <div class="gender-buttons" role="group" aria-label="Geschlecht">
+            <button type="button" class="gender-btn" data-gender="m" aria-label="Männlich">♂</button>
+            <button type="button" class="gender-btn" data-gender="w" aria-label="Weiblich">♀</button>
+          </div>
+          <label class="ak-select">
+            Altersklasse <span class="muted">(optional)</span>
+            <select id="f-age">
+              <option value="">— keine Angabe</option>
+              <option value="0">AK 0</option>
+              <option value="1">AK 1</option>
+              <option value="2">AK 2</option>
+              <option value="3">AK 3</option>
+              <option value="4">AK 4</option>
+            </select>
+          </label>
+        </div>
         <label>
           Anzahl
           <div class="counter">

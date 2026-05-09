@@ -24,7 +24,7 @@ const SHEETS = {
 
 const POST_HEADER = ["id", "name", "area", "lat", "lng"];
 const HUNTER_HEADER = ["name"];
-const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir"];
+const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 
 // ---------- HTTP entrypoints ----------
 
@@ -182,6 +182,13 @@ function logHarvest_(body) {
   const free = body.free_location || null;
   let post_id = String(body.post_id || "").trim();
 
+  // Optional descriptors. Empty string when unset; validated to known
+  // values otherwise so the stats tab doesn't get junk data.
+  let gender = String(body.gender || "").trim().toLowerCase();
+  if (gender && gender !== "m" && gender !== "w") gender = "";
+  let ageClass = String(body.age_class || "").trim();
+  if (ageClass && !/^[0-4]$/.test(ageClass)) ageClass = "";
+
   if (!hunter) return { error: "hunter required" };
   if (hunter.length > 40) return { error: "hunter name too long" };
   if (!/^[\p{L}][\p{L}\s.\-']{0,39}$/u.test(hunter)) {
@@ -270,6 +277,8 @@ function logHarvest_(body) {
     notes: notes,
     wind_speed: weather ? weather.wind_speed : "",
     wind_dir: weather ? weather.wind_dir : "",
+    gender: gender,
+    age_class: ageClass,
   });
 
   const out = { ok: true, hunter: canonical };
@@ -683,6 +692,119 @@ function installArchiveTrigger() {
   ScriptApp.newTrigger("archivePastSeasons").timeBased().atHour(1).everyDays(1).create();
 }
 
+// ---------- Auto-statistics ----------
+// Reads all harvest rows and rebuilds a 'stats' tab with three summary
+// tables + bar charts: by species, by gender, by age class. Wipes and
+// re-creates the tab on each call so it's always fresh.
+
+function rebuildStats() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const harvests = readHarvests_();
+
+  const bySpecies = {};
+  const byGender = { m: 0, w: 0, "?": 0 };
+  const byAge = { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "?": 0 };
+  let total = 0;
+  let withGender = 0;
+  let withAge = 0;
+
+  for (let i = 0; i < harvests.length; i++) {
+    const r = harvests[i];
+    const count = Number(r.count) || 0;
+    if (!count) continue;
+    const sp = String(r.species || "?").trim() || "?";
+    const g = String(r.gender || "").trim();
+    const a = String(r.age_class || "").trim();
+    bySpecies[sp] = (bySpecies[sp] || 0) + count;
+    if (g === "m" || g === "w") {
+      byGender[g] += count;
+      withGender += count;
+    } else {
+      byGender["?"] += count;
+    }
+    if (/^[0-4]$/.test(a)) {
+      byAge[a] += count;
+      withAge += count;
+    } else {
+      byAge["?"] += count;
+    }
+    total += count;
+  }
+
+  // Wipe and rebuild the stats tab.
+  let sheet = ss.getSheetByName("stats");
+  if (sheet) {
+    const charts = sheet.getCharts();
+    for (let c = 0; c < charts.length; c++) sheet.removeChart(charts[c]);
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet("stats");
+  }
+
+  sheet.getRange("A1").setValue("Statistik — aktualisiert " + new Date().toLocaleString("de-DE"))
+    .setFontWeight("bold");
+
+  let row = 3;
+  row = writeStatsBlock_(sheet, row, "Strecke nach Wildart",
+    Object.keys(bySpecies).sort(function (a, b) { return bySpecies[b] - bySpecies[a]; })
+      .map(function (k) { return [k, bySpecies[k]]; }));
+
+  row = writeStatsBlock_(sheet, row, "Strecke nach Geschlecht", [
+    ["männlich (♂)", byGender.m],
+    ["weiblich (♀)", byGender.w],
+    ["unbekannt", byGender["?"]],
+  ].filter(function (e) { return e[1] > 0; }));
+
+  row = writeStatsBlock_(sheet, row, "Strecke nach Altersklasse", [
+    ["AK 0", byAge["0"]],
+    ["AK 1", byAge["1"]],
+    ["AK 2", byAge["2"]],
+    ["AK 3", byAge["3"]],
+    ["AK 4", byAge["4"]],
+    ["unbekannt", byAge["?"]],
+  ].filter(function (e) { return e[1] > 0; }));
+
+  sheet.setColumnWidth(1, 180);
+  sheet.setColumnWidth(2, 90);
+
+  return { total: total, species: Object.keys(bySpecies).length, withGender: withGender, withAge: withAge };
+}
+
+function writeStatsBlock_(sheet, startRow, title, rows) {
+  if (!rows.length) return startRow;
+  sheet.getRange(startRow, 1).setValue(title).setFontWeight("bold").setFontSize(12);
+  const headerRow = startRow + 1;
+  sheet.getRange(headerRow, 1, 1, 2).setValues([["Kategorie", "Anzahl"]]).setFontWeight("bold");
+  const dataStart = headerRow + 1;
+  sheet.getRange(dataStart, 1, rows.length, 2).setValues(rows);
+  const dataEnd = dataStart + rows.length - 1;
+
+  const chart = sheet.newChart()
+    .setChartType(Charts.ChartType.BAR)
+    .addRange(sheet.getRange(headerRow, 1, rows.length + 1, 2))
+    .setPosition(dataEnd + 2, 1, 0, 0)
+    .setOption("title", title)
+    .setOption("legend", { position: "none" })
+    .setOption("hAxis", { title: "Anzahl" })
+    .setOption("colors", ["#1f3a1f"])
+    .build();
+  sheet.insertChart(chart);
+
+  // Leave room for chart (~16 rows) + spacer
+  return dataEnd + 18;
+}
+
+function installStatsTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "rebuildStats") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  // 02:00 daily — after the season-archive trigger at 01:00.
+  ScriptApp.newTrigger("rebuildStats").timeBased().atHour(2).everyDays(1).create();
+}
+
 // ---------- Privacy / access control ----------
 // Site mode + access password live in Script Properties (only the script
 // owner can read/write). Anyone can flip the toggle from the sheet via
@@ -693,12 +815,24 @@ const PROP_SITE_MODE = "siteMode";
 const PROP_ACCESS_HASH = "accessPasswordHash";
 
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu("🔒 Privacy")
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu("🔒 Privacy")
     .addItem("Privat schalten (Passwort setzen)", "menu_setPrivate")
     .addItem("Öffentlich schalten", "menu_setPublic")
     .addItem("Status anzeigen", "menu_showStatus")
     .addToUi();
+  ui.createMenu("📊 Statistik")
+    .addItem("Aktualisieren", "menu_rebuildStats")
+    .addToUi();
+}
+
+function menu_rebuildStats() {
+  const r = rebuildStats();
+  SpreadsheetApp.getUi().alert(
+    "Statistik aktualisiert.\n\n" +
+    "Gesamt-Strecke: " + r.total + " Stück\n" +
+    "Wildarten: " + r.species + " · Geschlecht erfasst: " + r.withGender + " · Altersklasse erfasst: " + r.withAge
+  );
 }
 
 function menu_setPrivate() {
@@ -1582,6 +1716,7 @@ function setup() {
 
   installArchiveTrigger();
   installPostsSyncTrigger();
+  installStatsTrigger();
 
   SpreadsheetApp.getUi().alert(
     "Importiert: " + rows.length + " Hochsitze." + syncMsg + "\n" +
