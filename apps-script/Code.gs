@@ -872,6 +872,7 @@ function onOpen() {
   ui.createMenu("📊 Statistik")
     .addItem("Aktualisieren", "menu_rebuildStats")
     .addItem("Posten neu klassifizieren", "menu_reclassifyPosts")
+    .addItem("Verlorene Klettersitz/Pirsch-Posten anzeigen", "menu_listLostFreePosts")
     .addToUi();
 }
 
@@ -968,6 +969,49 @@ function menu_reclassifyPosts() {
     "Verworfene Duplikate: " + drops.length + "\n" +
     "Harvest-Zeilen aktualisiert: " + harvestRefsRewritten
   );
+}
+
+// Lists Klettersitz/Pirsch/FREE post IDs that are referenced by harvest
+// rows but no longer have a matching row in the posts tab — i.e. lost.
+// Coords aren't recoverable (harvests don't store them), but knowing
+// which IDs and how many harvests each had helps Simon manually re-add
+// them with the same ID so the orphan history relinks automatically.
+function menu_listLostFreePosts() {
+  const harvests = readHarvests_();
+  const posts = readPosts_();
+  const known = {};
+  for (let i = 0; i < posts.length; i++) known[posts[i].id] = true;
+
+  const orphans = {};
+  for (let i = 0; i < harvests.length; i++) {
+    const h = harvests[i];
+    const pid = String(h.post_id || "").trim();
+    if (!pid || known[pid]) continue;
+    if (pid.indexOf("KS-") !== 0 && pid.indexOf("P-") !== 0 && pid.indexOf("FREE-") !== 0) continue;
+    if (!orphans[pid]) orphans[pid] = { count: 0, latest: "", entries: 0 };
+    orphans[pid].count += Number(h.count) || 0;
+    orphans[pid].entries++;
+    const ts = String(h.timestamp || "");
+    if (ts > orphans[pid].latest) orphans[pid].latest = ts;
+  }
+
+  const ids = Object.keys(orphans);
+  if (ids.length === 0) {
+    SpreadsheetApp.getUi().alert("Keine verlorenen Klettersitz- oder Pirsch-Posten.");
+    return;
+  }
+  let msg = "Diese Klettersitz/Pirsch-Posten fehlen im 'posts' Tab, " +
+    "obwohl noch Strecken-Einträge auf sie zeigen:\n\n";
+  ids.sort();
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const o = orphans[id];
+    msg += "• " + id + " — " + o.count + " Stück (" + o.entries + " Einträge), zuletzt " +
+      (o.latest ? o.latest.slice(0, 10) : "—") + "\n";
+  }
+  msg += "\nWiederherstellen: im 'posts' Tab eine neue Zeile mit dieser ID, " +
+    "Bereich = 'Klettersitz' oder 'Pirsch', und den Koordinaten anlegen.";
+  SpreadsheetApp.getUi().alert(msg);
 }
 
 function menu_rebuildStats() {
@@ -1841,11 +1885,34 @@ const INLINED_POSTS = [
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const postsSheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
-  if (postsSheet.getLastRow() > 1) {
-    postsSheet.getRange(2, 1, postsSheet.getLastRow() - 1, POST_HEADER.length).clearContent();
+
+  // Upsert INLINED_POSTS — update by ID if the row exists, append if not.
+  // Critically, this *preserves* user-created KS- / P- / FREE- prefixed
+  // rows (Klettersitz / Pirsch). Earlier setup() wiped the whole posts
+  // sheet and silently nuked those entries.
+  const lastRow = postsSheet.getLastRow();
+  const idToRow = {};
+  if (lastRow > 1) {
+    const existing = postsSheet.getRange(2, 1, lastRow - 1, POST_HEADER.length).getValues();
+    for (let i = 0; i < existing.length; i++) {
+      idToRow[String(existing[i][0]).trim()] = i + 2;
+    }
   }
-  const rows = INLINED_POSTS.map(function (p) { return [p.id, p.name, p.area, p.lat, p.lng]; });
-  postsSheet.getRange(2, 1, rows.length, POST_HEADER.length).setValues(rows);
+  const appended = [];
+  for (let i = 0; i < INLINED_POSTS.length; i++) {
+    const p = INLINED_POSTS[i];
+    const row = [p.id, p.name, p.area, p.lat, p.lng];
+    const rowIdx = idToRow[p.id];
+    if (rowIdx) {
+      postsSheet.getRange(rowIdx, 1, 1, POST_HEADER.length).setValues([row]);
+    } else {
+      appended.push(row);
+    }
+  }
+  if (appended.length > 0) {
+    postsSheet.getRange(postsSheet.getLastRow() + 1, 1, appended.length, POST_HEADER.length).setValues(appended);
+  }
+  const rows = INLINED_POSTS;
   ensureSheet_(ss, SHEETS.hunters, HUNTER_HEADER);
   ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
 
