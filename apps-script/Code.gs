@@ -410,32 +410,21 @@ const AREA_PREFIX_BY_AREA = {
   "Nordrand":    "NR",
 };
 
-// Approximate centers of each revier sub-area. Used to classify a
-// placemark by where it physically sits rather than which KML folder
-// it happens to live in — so a marker accidentally added to the wrong
-// layer in My Maps still gets the correct area, color, and ID prefix.
-const AREA_CENTERS = {
-  "Hauptrevier": { lat: 53.620, lng: 12.830 },
-  "Ost":         { lat: 53.617, lng: 12.853 },
-  "Nord":        { lat: 53.649, lng: 12.876 },
-  "Nordrand":    { lat: 53.659, lng: 12.884 },
-};
-
+// Geographic bounding boxes per revier sub-area. A placemark is classified
+// by whichever box it falls into (boxes are non-overlapping). Empty result
+// = the marker isn't inside any known revier and gets ignored.
+//
+// Splits derived from the actual marker coords:
+//   - HR's eastern edge at lng 12.84972; Ost's western edge at lng 12.85003
+//     → boundary at 12.850 (HR strictly < 12.850, Ost ≥ 12.850).
+//   - HR's northern edge ≈ 53.631; Nord's southern edge ≈ 53.646 → safe gap.
+//   - Nord top ≈ 53.654; Nordrand bottom ≈ 53.655 → boundary at 53.654.
 function classifyByCoords_(lat, lng) {
-  let best = null;
-  let bestDist = Infinity;
-  // Compress the longitude axis by cos(lat)^2 ≈ 0.36 at lat 53.6 so
-  // the squared distance is roughly metric-comparable.
-  for (const area in AREA_CENTERS) {
-    const c = AREA_CENTERS[area];
-    const dLat = lat - c.lat;
-    const dLng = (lng - c.lng) * 0.6;
-    const d = dLat * dLat + dLng * dLng;
-    if (d < bestDist) { bestDist = d; best = area; }
-  }
-  // Reject placemarks too far from any known center (>~5km).
-  if (bestDist > 0.0025) return null;
-  return best;
+  if (lat >= 53.605 && lat <= 53.640 && lng >= 12.810 && lng <  12.850) return "Hauptrevier";
+  if (lat >= 53.610 && lat <= 53.625 && lng >= 12.850 && lng <= 12.860) return "Ost";
+  if (lat >  53.640 && lat <= 53.654 && lng >= 12.860 && lng <= 12.890) return "Nord";
+  if (lat >  53.654 && lat <= 53.670 && lng >= 12.870 && lng <= 12.895) return "Nordrand";
+  return null;
 }
 
 function syncPostsFromKml() {
@@ -882,7 +871,103 @@ function onOpen() {
     .addToUi();
   ui.createMenu("📊 Statistik")
     .addItem("Aktualisieren", "menu_rebuildStats")
+    .addItem("Posten neu klassifizieren", "menu_reclassifyPosts")
     .addToUi();
+}
+
+// Walk every row in the posts sheet and rename any whose ID prefix /
+// area no longer match where the marker physically sits. Runs once
+// after the bounding-box classifier was tightened so existing wrong
+// entries get fixed in place — IDs and area are updated, harvest rows
+// referring to the old ID get rewritten to the new ID, and ID
+// collisions (where the correct row already exists) trigger a row
+// deletion of the orphan instead of a rename.
+function menu_reclassifyPosts() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const postsSheet = ensureSheet_(ss, SHEETS.posts, POST_HEADER);
+  const harvestsSheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
+  const lastRow = postsSheet.getLastRow();
+  if (lastRow < 2) {
+    ui.alert("Keine Posten zum Reklassifizieren.");
+    return;
+  }
+  const data = postsSheet.getRange(2, 1, lastRow - 1, POST_HEADER.length).getValues();
+
+  // Build a set of all existing post IDs so we can detect collisions.
+  const existingIds = {};
+  for (let i = 0; i < data.length; i++) existingIds[String(data[i][0]).trim()] = i;
+
+  const renames = []; // {rowIdx, oldId, newId, newArea}
+  const drops = [];   // rowIdx (1-based) — orphans where the correct row already exists
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const id = String(row[0]).trim();
+    const lat = Number(row[3]);
+    const lng = Number(row[4]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    // User-created free posts (Klettersitz / Pirsch) shouldn't be re-prefixed.
+    if (id.indexOf("KS-") === 0 || id.indexOf("P-") === 0 || id.indexOf("FREE-") === 0) continue;
+    const correctArea = classifyByCoords_(lat, lng);
+    if (!correctArea) continue;
+    const correctPrefix = AREA_PREFIX_BY_AREA[correctArea];
+    const dashIdx = id.indexOf("-");
+    if (dashIdx <= 0) continue;
+    const currentPrefix = id.substring(0, dashIdx);
+    if (currentPrefix === correctPrefix) continue;
+    const idCore = id.substring(dashIdx + 1);
+    const newId = correctPrefix + "-" + idCore;
+    if (existingIds[newId] !== undefined && existingIds[newId] !== i) {
+      // Correct row already exists → orphan, drop this one.
+      drops.push(i + 2);
+    } else {
+      renames.push({ rowIdx: i + 2, oldId: id, newId: newId, newArea: correctArea });
+      existingIds[newId] = i;
+      delete existingIds[id];
+    }
+  }
+
+  // Apply renames: update id (col 1) and area (col 3) in-place; rewrite
+  // any harvest row referring to oldId.
+  const harvestHeader = harvestsSheet.getLastColumn() > 0
+    ? harvestsSheet.getRange(1, 1, 1, harvestsSheet.getLastColumn()).getValues()[0]
+    : [];
+  const postIdCol = harvestHeader.indexOf("post_id") + 1; // 1-based, 0 if not found
+  const harvestLastRow = harvestsSheet.getLastRow();
+  let harvestVals = null;
+  if (postIdCol > 0 && harvestLastRow > 1) {
+    harvestVals = harvestsSheet.getRange(2, postIdCol, harvestLastRow - 1, 1).getValues();
+  }
+  let harvestRefsRewritten = 0;
+  for (let r = 0; r < renames.length; r++) {
+    const u = renames[r];
+    postsSheet.getRange(u.rowIdx, 1).setValue(u.newId);
+    postsSheet.getRange(u.rowIdx, 3).setValue(u.newArea);
+    if (harvestVals) {
+      for (let j = 0; j < harvestVals.length; j++) {
+        if (String(harvestVals[j][0]).trim() === u.oldId) {
+          harvestVals[j][0] = u.newId;
+          harvestRefsRewritten++;
+        }
+      }
+    }
+  }
+  if (harvestVals && harvestRefsRewritten > 0) {
+    harvestsSheet.getRange(2, postIdCol, harvestVals.length, 1).setValues(harvestVals);
+  }
+
+  // Apply drops: delete rows from bottom up so the indices stay valid.
+  drops.sort(function (a, b) { return b - a; });
+  for (let d = 0; d < drops.length; d++) {
+    postsSheet.deleteRow(drops[d]);
+  }
+
+  ui.alert(
+    "Posten reklassifiziert.\n\n" +
+    "Umbenannt: " + renames.length + "\n" +
+    "Verworfene Duplikate: " + drops.length + "\n" +
+    "Harvest-Zeilen aktualisiert: " + harvestRefsRewritten
+  );
 }
 
 function menu_rebuildStats() {
