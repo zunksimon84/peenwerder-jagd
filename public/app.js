@@ -904,13 +904,23 @@ async function openStrecke() {
     }
     for (const row of data.by_species) {
       const li = document.createElement("li");
+      const head = document.createElement("div");
+      head.className = "strecke-head";
       const name = document.createElement("span");
       name.textContent = row.species;
       const count = document.createElement("span");
       count.className = "count";
       count.textContent = row.count;
-      li.appendChild(name);
-      li.appendChild(count);
+      head.appendChild(name);
+      head.appendChild(count);
+      li.appendChild(head);
+      const sub = breakdownText(row.gender, row.age);
+      if (sub) {
+        const subEl = document.createElement("div");
+        subEl.className = "strecke-sub";
+        subEl.textContent = sub;
+        li.appendChild(subEl);
+      }
       list.appendChild(li);
     }
     renderTimeline(data);
@@ -919,6 +929,23 @@ async function openStrecke() {
     showToast("Strecke konnte nicht geladen werden", "error", 4000);
     console.warn(err);
   }
+}
+
+function breakdownText(gender, age) {
+  if (!gender && !age) return "";
+  const parts = [];
+  if (gender) {
+    if (gender.m > 0) parts.push("♂ " + gender.m);
+    if (gender.w > 0) parts.push("♀ " + gender.w);
+  }
+  if (age) {
+    const akParts = [];
+    for (const k of ["0", "1", "2", "3", "4"]) {
+      if (age[k] > 0) akParts.push("AK" + k + " " + age[k]);
+    }
+    if (akParts.length) parts.push(akParts.join(", "));
+  }
+  return parts.join(" · ");
 }
 
 function closeStrecke() {

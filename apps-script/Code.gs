@@ -80,7 +80,7 @@ function strecke_(params) {
   const to = toIso ? new Date(toIso) : null;
 
   const rows = readHarvests_();
-  const counts = {};
+  const buckets = {}; // species → {count, gender:{m,w,unknown}, age:{0..4,unknown}}
   let total = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -90,11 +90,30 @@ function strecke_(params) {
     const sp = String(r.species || "").trim();
     if (!sp) continue;
     const n = Number(r.count) || 0;
-    counts[sp] = (counts[sp] || 0) + n;
+    if (!n) continue;
+    if (!buckets[sp]) {
+      buckets[sp] = {
+        count: 0,
+        gender: { m: 0, w: 0, unknown: 0 },
+        age: { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, unknown: 0 },
+      };
+    }
+    const b = buckets[sp];
+    b.count += n;
     total += n;
+    const g = String(r.gender || "").trim().toLowerCase();
+    if (g === "m") b.gender.m += n;
+    else if (g === "w") b.gender.w += n;
+    else b.gender.unknown += n;
+    const a = String(r.age_class || "").trim();
+    if (a === "0" || a === "1" || a === "2" || a === "3" || a === "4") b.age[a] += n;
+    else b.age.unknown += n;
   }
-  const by_species = Object.keys(counts)
-    .map(function (sp) { return { species: sp, count: counts[sp] }; })
+  const by_species = Object.keys(buckets)
+    .map(function (sp) {
+      const b = buckets[sp];
+      return { species: sp, count: b.count, gender: b.gender, age: b.age };
+    })
     .sort(function (a, b) { return b.count - a.count; });
 
   // Per-day counts for the current hunting season, regardless of the

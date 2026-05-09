@@ -636,12 +636,22 @@ body {
 }
 
 #strecke-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  display: block;
   padding: 9px 4px;
   border-top: 1px solid var(--border);
   font-size: 15px;
+}
+
+#strecke-list .strecke-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+#strecke-list .strecke-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 #strecke-list li:first-child {
