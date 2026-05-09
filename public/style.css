@@ -336,6 +336,7 @@ body {
 #harvest-form select,
 #harvest-form input[type="number"],
 #harvest-form input[type="text"],
+#harvest-form input[type="datetime-local"],
 #harvest-form input:not([type]),
 #harvest-form textarea {
   font: inherit;
@@ -348,6 +349,13 @@ body {
   width: 100%;
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* Light orange background to make the date/time picker pop — easy to
+   notice that it's editable and shouldn't just be left at "now". */
+#harvest-form input[type="datetime-local"] {
+  background: #ffe0b2;
+  border-color: #f0c179;
 }
 
 #harvest-form textarea {
@@ -375,9 +383,9 @@ body {
 }
 
 .ghost {
-  background: #e8e6dd;
+  background: #ffe0b2;
   color: var(--green-dark);
-  border: 1px solid var(--border);
+  border: 1px solid #f0c179;
   border-radius: 8px;
   padding: 9px 14px;
   font-size: 14px;
@@ -388,7 +396,7 @@ body {
 }
 
 .ghost:active {
-  background: #ddd9cb;
+  background: #ffcc80;
 }
 
 #f-submit {
