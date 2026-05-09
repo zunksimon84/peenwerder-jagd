@@ -238,15 +238,31 @@ function logHarvest_(body) {
   }
   const canonical = known || hunter;
 
+  // Resolve harvest time — user can backdate (logging yesterday's hunt
+  // today). Falls back to now on missing/invalid input. Reject far-
+  // future entries (>1h ahead) and very old (>2 years) as data hygiene.
+  let harvestTime = new Date();
+  const userTs = String(body.timestamp || "").trim();
+  if (userTs) {
+    const parsed = new Date(userTs);
+    if (!isNaN(parsed)) {
+      const diffMs = parsed.getTime() - Date.now();
+      const TWO_YEARS_MS = 2 * 365 * 86400000;
+      if (diffMs <= 3600000 && diffMs >= -TWO_YEARS_MS) {
+        harvestTime = parsed;
+      }
+    }
+  }
+
   // Pick the lat/lng to query weather for.
   const targetPost = createdPost || posts.find(function (p) { return p.id === post_id; });
   const weather = (targetPost && Number.isFinite(targetPost.lat) && Number.isFinite(targetPost.lng))
-    ? fetchWeather_(targetPost.lat, targetPost.lng, new Date())
+    ? fetchWeather_(targetPost.lat, targetPost.lng, harvestTime)
     : null;
 
   const sheet = ensureSheet_(ss, SHEETS.harvests, HARVEST_HEADER);
   appendByName_(sheet, {
-    timestamp: new Date().toISOString(),
+    timestamp: harvestTime.toISOString(),
     hunter: canonical,
     post_id: post_id,
     species: speciesVal,

@@ -583,6 +583,13 @@ async function loadHistory(postId) {
   }
 }
 
+// "YYYY-MM-DDTHH:MM" in local time, ready for <input type="datetime-local">.
+function localNowForInput() {
+  const d = new Date();
+  const offsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d - offsetMs).toISOString().slice(0, 16);
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
@@ -663,6 +670,10 @@ function openSheet(postId) {
   $("#f-free-label").value = "";
   $("#f-free-lat").value = "";
   $("#f-free-lng").value = "";
+  // Default the date/time picker to "now" in local time. The user can
+  // backdate it if they're logging a harvest from yesterday — the
+  // backend will use this timestamp for the row + the wind lookup.
+  $("#f-time").value = localNowForInput();
   setSheetMode("post"); // Klettersitz is opt-in via the toggle.
   $("#sheet").hidden = false;
   $("#sheet-backdrop").hidden = false;
@@ -684,6 +695,13 @@ async function submitHarvest(ev) {
       count: Number($("#f-count").value),
       notes: $("#f-notes").value.trim(),
     };
+    const timeStr = $("#f-time").value;
+    if (timeStr) {
+      // datetime-local gives a naive local-time string; new Date() reads
+      // it as local time, .toISOString() converts to UTC for storage.
+      const ts = new Date(timeStr);
+      if (!isNaN(ts)) body.timestamp = ts.toISOString();
+    }
     if (!body.hunter || body.hunter === "__new__") throw new Error("Bitte Jäger wählen");
     if (body.hunter.length > 40) throw new Error("Name zu lang (max 40)");
     if (state.sheetMode === "post") {
