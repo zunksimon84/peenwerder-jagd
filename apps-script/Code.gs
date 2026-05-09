@@ -101,11 +101,11 @@ function strecke_(params) {
     const b = buckets[sp];
     b.count += n;
     total += n;
-    const g = String(r.gender || "").trim().toLowerCase();
+    const g = safeStr_(r.gender).toLowerCase();
     if (g === "m") b.gender.m += n;
     else if (g === "w") b.gender.w += n;
     else b.gender.unknown += n;
-    const a = String(r.age_class || "").trim();
+    const a = safeStr_(r.age_class);
     if (a === "0" || a === "1" || a === "2" || a === "3" || a === "4") b.age[a] += n;
     else b.age.unknown += n;
   }
@@ -162,8 +162,8 @@ function history_(params) {
         notes: String(r.notes || ""),
         wind_speed: ws === "" || ws === null || ws === undefined ? null : Number(ws),
         wind_dir: wd === "" || wd === null || wd === undefined ? null : Number(wd),
-        gender: String(r.gender || ""),
-        age_class: String(r.age_class || ""),
+        gender: safeStr_(r.gender),
+        age_class: safeStr_(r.age_class),
       };
     })
     .sort(function (a, b) {
@@ -761,8 +761,8 @@ function rebuildStats() {
     const count = Number(r.count) || 0;
     if (!count) continue;
     const sp = String(r.species || "?").trim() || "?";
-    const g = String(r.gender || "").trim();
-    const a = String(r.age_class || "").trim();
+    const g = safeStr_(r.gender);
+    const a = safeStr_(r.age_class);
     bySpecies[sp] = (bySpecies[sp] || 0) + count;
     if (g === "m" || g === "w") {
       byGender[g] += count;
@@ -1113,6 +1113,14 @@ function json_(obj /*, statusCode (advisory only) */) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Convert a sheet cell value to a trimmed string without the falsy-trap
+// of `value || ""` — which would turn the number 0 (e.g. age_class for
+// AK 0) into the empty string and silently drop it from stats.
+function safeStr_(v) {
+  if (v === null || v === undefined) return "";
+  return String(v).trim();
 }
 
 
