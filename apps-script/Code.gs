@@ -162,6 +162,8 @@ function history_(params) {
         notes: String(r.notes || ""),
         wind_speed: ws === "" || ws === null || ws === undefined ? null : Number(ws),
         wind_dir: wd === "" || wd === null || wd === undefined ? null : Number(wd),
+        gender: String(r.gender || ""),
+        age_class: String(r.age_class || ""),
       };
     })
     .sort(function (a, b) {

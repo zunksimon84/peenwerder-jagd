@@ -520,6 +520,13 @@ body {
   font-style: italic;
 }
 
+#history li .hist-sub {
+  margin-top: 2px;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 #history li .wind {
   display: inline-flex;
   align-items: center;

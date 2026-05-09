@@ -567,14 +567,21 @@ async function loadHistory(postId) {
       listEl.appendChild(p);
       return;
     }
-    for (const h of data) {
+    const grouped = groupHistoryByDayHunter(data);
+    for (const g of grouped) {
       const li = document.createElement("li");
-      const when = h.timestamp ? HISTORY_DATE_FMT.format(new Date(h.timestamp)) : "—";
-      li.innerHTML =
+      const when = g.timestamp ? HISTORY_DATE_FMT.format(new Date(g.timestamp)) : "—";
+      const speciesParts = Object.entries(g.bySpecies).map(([sp, info]) =>
+        `<strong>${escapeHtml(sp)}</strong> ×${info.count}`
+      );
+      const head =
         `<span class="when">${when}</span>` +
-        `<strong>${escapeHtml(h.species)}</strong> ×${h.count}` +
-        ` <span class="who">${escapeHtml(h.hunter)}</span>` +
-        windHtml(h.wind_speed, h.wind_dir);
+        speciesParts.join(", ") +
+        ` <span class="who">${escapeHtml(g.hunter)}</span>` +
+        windHtml(g.wind_speed, g.wind_dir);
+      const breakdown = breakdownText(g.gender, g.age);
+      li.innerHTML = `<div>${head}</div>` +
+        (breakdown ? `<div class="hist-sub">${breakdown}</div>` : "");
       listEl.appendChild(li);
     }
   } catch (err) {
@@ -588,6 +595,42 @@ function localNowForInput() {
   const d = new Date();
   const offsetMs = d.getTimezoneOffset() * 60000;
   return new Date(d - offsetMs).toISOString().slice(0, 16);
+}
+
+// Combine multiple harvests by the same hunter on the same calendar day
+// into a single grouped entry: sums per-species counts, rolls up
+// gender/age tallies, and keeps the most recent entry's wind reading
+// (data arrives sorted timestamp-desc from the backend).
+function groupHistoryByDayHunter(rows) {
+  const map = new Map();
+  for (const h of rows) {
+    if (!h.timestamp) continue;
+    const dayKey = h.timestamp.slice(0, 10) + "|" + (h.hunter || "");
+    let g = map.get(dayKey);
+    if (!g) {
+      g = {
+        timestamp: h.timestamp,
+        hunter: h.hunter || "",
+        wind_speed: h.wind_speed,
+        wind_dir: h.wind_dir,
+        bySpecies: {},
+        gender: { m: 0, w: 0, unknown: 0 },
+        age: { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, unknown: 0 },
+      };
+      map.set(dayKey, g);
+    }
+    if (!g.bySpecies[h.species]) g.bySpecies[h.species] = { count: 0 };
+    g.bySpecies[h.species].count += h.count;
+    const gen = String(h.gender || "").toLowerCase();
+    if (gen === "m" || gen === "w") g.gender[gen] += h.count;
+    else g.gender.unknown += h.count;
+    const age = String(h.age_class || "");
+    if (/^[0-4]$/.test(age)) g.age[age] += h.count;
+    else g.age.unknown += h.count;
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    (b.timestamp || "").localeCompare(a.timestamp || "")
+  );
 }
 
 function escapeHtml(s) {
