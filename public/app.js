@@ -13,7 +13,7 @@ const state = {
   heatOverlay: null,     // heatmap.js OverlayView wrapper
   markers: new Map(),    // post_id → marker
   selectedPostId: null,
-  filters: { species: "", range: "season" },
+  filters: { species: "", range: "season", customDate: "" },
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -508,6 +508,14 @@ function rangeToDates(range) {
     startOfDay.setHours(0, 0, 0, 0);
     return { from: startOfDay.toISOString() };
   }
+  if (range === "custom" && state.filters.customDate) {
+    // Single calendar day in local time, 00:00 → 23:59:59.
+    const start = new Date(state.filters.customDate + "T00:00:00");
+    const end = new Date(state.filters.customDate + "T23:59:59");
+    if (!isNaN(start) && !isNaN(end)) {
+      return { from: start.toISOString(), to: end.toISOString() };
+    }
+  }
   return {};
 }
 
@@ -829,8 +837,29 @@ function wireUi() {
     state.filters.species = e.target.value;
     refreshAggregates();
   });
+  const filterDate = $("#filter-date");
   $("#filter-range").addEventListener("change", (e) => {
     state.filters.range = e.target.value;
+    if (state.filters.range === "custom") {
+      filterDate.hidden = false;
+      // Default the picker to today if not yet set.
+      if (!filterDate.value) {
+        const today = new Date();
+        const offsetMs = today.getTimezoneOffset() * 60000;
+        filterDate.value = new Date(today - offsetMs).toISOString().slice(0, 10);
+      }
+      state.filters.customDate = filterDate.value;
+      // Open the native picker right away on browsers that support it.
+      if (typeof filterDate.showPicker === "function") {
+        try { filterDate.showPicker(); } catch (e2) { /* not allowed yet */ }
+      }
+    } else {
+      filterDate.hidden = true;
+    }
+    refreshAggregates();
+  });
+  filterDate.addEventListener("change", (e) => {
+    state.filters.customDate = e.target.value;
     refreshAggregates();
   });
 
@@ -916,7 +945,19 @@ const RANGE_LABEL = {
   "30d": "Letzte 30 Tage",
   "7d": "Letzte 7 Tage",
   today: "Heute",
+  custom: "Datum",
 };
+
+function rangeLabelFor(range) {
+  if (range === "custom" && state.filters.customDate) {
+    const parts = state.filters.customDate.split("-");
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", year: "numeric" }).format(d);
+    }
+  }
+  return RANGE_LABEL[range] || "";
+}
 
 async function openStrecke() {
   const list = $("#strecke-list");
@@ -924,7 +965,7 @@ async function openStrecke() {
   const rangeEl = $("#strecke-range");
   list.innerHTML = "";
   totalEl.textContent = "…";
-  rangeEl.textContent = RANGE_LABEL[state.filters.range] || "";
+  rangeEl.textContent = rangeLabelFor(state.filters.range);
   $("#strecke-backdrop").hidden = false;
   $("#strecke-modal").hidden = false;
   if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
