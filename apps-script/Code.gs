@@ -402,6 +402,42 @@ const AREA_PREFIX = {
   "Peenwerder Nordrand": "NR",
 };
 
+// Inverse map (area name → ID prefix) for coord-based classification.
+const AREA_PREFIX_BY_AREA = {
+  "Hauptrevier": "HR",
+  "Ost":         "OST",
+  "Nord":        "N",
+  "Nordrand":    "NR",
+};
+
+// Approximate centers of each revier sub-area. Used to classify a
+// placemark by where it physically sits rather than which KML folder
+// it happens to live in — so a marker accidentally added to the wrong
+// layer in My Maps still gets the correct area, color, and ID prefix.
+const AREA_CENTERS = {
+  "Hauptrevier": { lat: 53.620, lng: 12.830 },
+  "Ost":         { lat: 53.617, lng: 12.853 },
+  "Nord":        { lat: 53.649, lng: 12.876 },
+  "Nordrand":    { lat: 53.659, lng: 12.884 },
+};
+
+function classifyByCoords_(lat, lng) {
+  let best = null;
+  let bestDist = Infinity;
+  // Compress the longitude axis by cos(lat)^2 ≈ 0.36 at lat 53.6 so
+  // the squared distance is roughly metric-comparable.
+  for (const area in AREA_CENTERS) {
+    const c = AREA_CENTERS[area];
+    const dLat = lat - c.lat;
+    const dLng = (lng - c.lng) * 0.6;
+    const d = dLat * dLat + dLng * dLng;
+    if (d < bestDist) { bestDist = d; best = area; }
+  }
+  // Reject placemarks too far from any known center (>~5km).
+  if (bestDist > 0.0025) return null;
+  return best;
+}
+
 function syncPostsFromKml() {
   const res = UrlFetchApp.fetch(KML_URL, { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) {
@@ -449,28 +485,30 @@ function syncPostsFromKml() {
 }
 
 function parseKmlPosts_(kml) {
-  const folders = parseKmlFolders_(kml);
+  // Walk every Point placemark in the whole KML — folder membership is
+  // a hint we ignore. The placemark's coordinates decide which revier
+  // it belongs to (classifyByCoords_), so a marker accidentally added
+  // to the wrong My Maps layer still gets the right area + ID prefix.
+  const placemarks = parseKmlPointPlacemarks_(kml);
   const out = [];
-  for (let i = 0; i < folders.length; i++) {
-    const folder = folders[i];
-    const prefix = AREA_PREFIX[folder.name];
+  for (let j = 0; j < placemarks.length; j++) {
+    const pm = placemarks[j];
+    if (!isHuntingPostName_(pm.name)) continue;
+    const num = postNumber_(pm.name);
+    if (!num) continue;
+    const area = classifyByCoords_(pm.lat, pm.lng);
+    if (!area) continue;
+    const prefix = AREA_PREFIX_BY_AREA[area];
     if (!prefix) continue;
-    const placemarks = parseKmlPointPlacemarks_(folder.body);
-    for (let j = 0; j < placemarks.length; j++) {
-      const pm = placemarks[j];
-      if (!isHuntingPostName_(pm.name)) continue;
-      const num = postNumber_(pm.name);
-      if (!num) continue;
-      const isDjb = /^DJB/i.test(pm.name);
-      const idCore = (isDjb ? "DJB" : "") + num;
-      out.push({
-        id: prefix + "-" + idCore.toUpperCase(),
-        name: pm.name,
-        area: folder.name.replace(/^Peenwerder\s+/, ""),
-        lat: pm.lat,
-        lng: pm.lng,
-      });
-    }
+    const isDjb = /^DJB/i.test(pm.name);
+    const idCore = (isDjb ? "DJB" : "") + num;
+    out.push({
+      id: prefix + "-" + idCore.toUpperCase(),
+      name: pm.name,
+      area: area,
+      lat: pm.lat,
+      lng: pm.lng,
+    });
   }
   // Suffix duplicate IDs so they remain unique (matches parse-kml.mjs).
   const seen = {};
