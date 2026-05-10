@@ -81,10 +81,13 @@ body {
 }
 
 .brand-eye {
-  width: 20px;
-  height: 12px;
+  /* Bullet-eye logo PNG (replaces the old inline SVG eye). Sized so it
+     reads at the same visual weight as the wordmark next to it. */
+  width: 30px;
+  height: auto;
   flex-shrink: 0;
-  color: #111;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .brand-place {
@@ -841,8 +844,8 @@ body {
 }
 
 .gate-brand .brand-eye {
-  width: 26px;
-  height: 16px;
+  width: 38px;
+  height: auto;
 }
 
 .gate-sub {
