@@ -227,6 +227,24 @@ body {
   font-size: 13px;
   max-width: 60vw;
   z-index: 7;
+  overflow: hidden;
+  isolation: isolate; /* new stacking context for the ::before watermark */
+}
+
+#leaderboard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("boar.png") right center / auto 110% no-repeat;
+  opacity: 0.14;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+#leaderboard > * {
+  position: relative;
+  z-index: 1;
 }
 
 #leaderboard strong {
