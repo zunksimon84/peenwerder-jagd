@@ -1,6 +1,13 @@
 :root {
   --green-dark: #1f3a1f;
   --green-mid: #4a6a3a;
+  /* Brenneke-inspired bright lime, used for the topbar to give the app
+     a recognisable identity. Pairs with near-black text for the same
+     high-contrast look the poster uses. */
+  --green-bright: #b5d33a;
+  --green-bright-edge: #97b730;
+  --steel: #8a8e92; /* metallic grey accent, like the bullet jackets */
+  --steel-dark: #4a4d52;
   --bg: #f6f4ef;
   --card: #ffffff;
   --text: #1a1a1a;
@@ -39,13 +46,14 @@ body {
   left: 0;
   right: 0;
   z-index: 10;
-  background: var(--green-dark);
-  color: #fff;
+  background: var(--green-bright);
+  color: #111;
   padding: calc(8px + var(--safe-top)) 12px 8px;
   display: flex;
   align-items: center;
   gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--green-bright-edge);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 #topbar h1 {
@@ -67,17 +75,20 @@ body {
   font-weight: 400;
   letter-spacing: 1.2px;
   font-size: 18px;
+  color: #111;
 }
 
 .brand-eye {
   width: 20px;
   height: 12px;
   flex-shrink: 0;
+  color: #111;
 }
 
 .brand-place {
   font-weight: 500;
-  opacity: 0.9;
+  color: #1a1a1a;
+  opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -95,9 +106,9 @@ body {
 }
 
 .filters select {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #1a1a1a;
+  color: var(--green-bright);
+  border: 1px solid #1a1a1a;
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 13px;
@@ -107,30 +118,32 @@ body {
 
 .filters select option {
   color: #000;
+  background: #fff;
 }
 
 #filter-date {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #1a1a1a;
+  color: var(--green-bright);
+  border: 1px solid #1a1a1a;
   border-radius: 999px;
   padding: 5px 10px;
   font: inherit;
   font-size: 13px;
-  /* color-scheme dark hints the native picker so the calendar UI matches
-     the topbar's dark theme on iOS / macOS. */
+  /* color-scheme dark hints the native picker to use a dark calendar
+     overlay that matches the chip on iOS / macOS. */
   color-scheme: dark;
 }
 
 .filter-btn {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #1a1a1a;
+  color: var(--green-bright);
+  border: 1px solid #1a1a1a;
   border-radius: 999px;
   padding: 6px 12px;
   font: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
 }
 
@@ -758,7 +771,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: var(--green-dark);
+  background: #0e0e0e;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -781,6 +794,7 @@ body {
   max-width: 360px;
   text-align: center;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--green-bright);
 }
 
 .gate-brand {
@@ -788,7 +802,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--green-dark);
+  color: #111;
   font-size: 22px;
 }
 
