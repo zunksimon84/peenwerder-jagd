@@ -222,12 +222,12 @@ async function bootstrap() {
 // ---------------- Rendering ----------------
 
 const AREA_COLOR = {
-  Hauptrevier: "#2e7d32",
+  Hauptrevier: "#b5d33a", // Brenneke lime — was dark forest green
   Ost: "#1565c0",
   Nord: "#ef6c00",
   Nordrand: "#6a1b9a",
   Klettersitz: "#03a9f4", // bright blue — hunter-created mobile climber stands
-  Pirsch: "#fdd835", // yellow — hunter-created stalking locations
+  Pirsch: "#e2dc3a",      // cooler lemon — hunter-created stalking locations
 };
 
 const FREE_AREAS = new Set(["Klettersitz", "Pirsch"]);

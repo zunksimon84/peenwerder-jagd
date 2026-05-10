@@ -8,11 +8,13 @@
   --green-bright-edge: #97b730;
   --steel: #8a8e92; /* metallic grey accent, like the bullet jackets */
   --steel-dark: #4a4d52;
-  --bg: #f6f4ef;
+  /* Form surfaces — switched from a warm cream to a cool light grey
+     so the inputs read as 'colder' alongside the lime topbar. */
+  --bg: #eef1f4;
   --card: #ffffff;
   --text: #1a1a1a;
   --muted: #6b6b6b;
-  --border: #d8d4c8;
+  --border: #d0d5db;
   --accent: #b94a2c;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -350,7 +352,7 @@ body {
 }
 
 .mode-btn.active[data-mode="pirsch"] {
-  background: #fdd835;
+  background: #e2dc3a;
   color: #1f1f1f;
 }
 
@@ -441,12 +443,7 @@ body {
   appearance: none;
 }
 
-/* Light orange background to make the date/time picker pop — easy to
-   notice that it's editable and shouldn't just be left at "now". */
-#harvest-form input[type="datetime-local"] {
-  background: #ffe0b2;
-  border-color: #f0c179;
-}
+/* No special highlight — inherits the cool grey form-input look. */
 
 #harvest-form textarea {
   resize: vertical;
@@ -473,9 +470,9 @@ body {
 }
 
 .ghost {
-  background: #ffe0b2;
+  background: #e3e7ec;
   color: var(--green-dark);
-  border: 1px solid #f0c179;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 9px 14px;
   font-size: 14px;
@@ -486,7 +483,7 @@ body {
 }
 
 .ghost:active {
-  background: #ffcc80;
+  background: #d4d9df;
 }
 
 #f-submit {
@@ -887,11 +884,12 @@ body {
   left: 50%;
   bottom: calc(80px + var(--safe-bottom) + var(--vv-bottom));
   transform: translateX(-50%);
-  background: var(--green-dark);
-  color: #fff;
+  background: var(--green-bright);
+  color: #111;
   padding: 10px 16px;
   border-radius: 999px;
   font-size: 14px;
+  font-weight: 600;
   z-index: 30;
   max-width: 80vw;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
