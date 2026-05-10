@@ -162,7 +162,7 @@ body {
   right: 16px;
   /* Extra bottom margin so the button clears Chrome's bottom-toolbar
      navigation buttons that visualViewport doesn't always inset for. */
-  bottom: calc(96px + var(--safe-bottom) + var(--vv-bottom));
+  bottom: calc(66px + var(--safe-bottom) + var(--vv-bottom));
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -186,7 +186,7 @@ body {
   left: 50%;
   /* Extra bottom margin to clear Chrome's bottom-nav buttons, matches
      the FAB clearance. */
-  bottom: calc(100px + var(--safe-bottom) + var(--vv-bottom));
+  bottom: calc(70px + var(--safe-bottom) + var(--vv-bottom));
   transform: translateX(-50%);
   z-index: 8;
   display: flex;
