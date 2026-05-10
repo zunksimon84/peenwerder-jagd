@@ -637,9 +637,14 @@ body {
   position: absolute;
   inset: 0;
   background: url("roebuck.png") no-repeat;
-  background-position: calc(100% + 30px) 75%;
-  background-size: auto 320px;
-  opacity: 0.20;
+  /* Image faces left (head on the left). Anchored toward the middle of
+     the modal so the head sits around horizontal center; body extends
+     past the right edge and gets cropped — that's fine. Vertical anchor
+     puts the head around the modal's middle; whatever falls past the
+     bottom edge is also cropped. */
+  background-position: 30% 130px;
+  background-size: auto 400px;
+  opacity: 0.18;
   pointer-events: none;
   z-index: 0;
   border-radius: inherit;
