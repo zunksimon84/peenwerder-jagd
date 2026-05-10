@@ -635,9 +635,9 @@ body {
   position: absolute;
   inset: 0;
   background: url("roebuck.svg") no-repeat;
-  background-position: calc(100% + 24px) bottom 60px;
-  background-size: auto 220px;
-  opacity: 0.10;
+  background-position: calc(100% + 36px) bottom 50px;
+  background-size: auto 320px;
+  opacity: 0.18;
   pointer-events: none;
   z-index: 0;
   border-radius: inherit;
