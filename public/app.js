@@ -587,7 +587,10 @@ async function loadHistory(postId) {
         speciesParts.join(", ") +
         ` <span class="who">${escapeHtml(g.hunter)}</span>` +
         windHtml(g.wind_speed, g.wind_dir);
-      const breakdown = breakdownText(g.gender, g.age);
+      // Gender only in the per-post history list; age classes would
+      // crowd the line. Full age+gender breakdown stays in the
+      // Strecke popup.
+      const breakdown = breakdownText(g.gender, null);
       li.innerHTML = `<div>${head}</div>` +
         (breakdown ? `<div class="hist-sub">${breakdown}</div>` : "");
       listEl.appendChild(li);
