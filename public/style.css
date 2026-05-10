@@ -160,7 +160,9 @@ body {
 #fab {
   position: fixed;
   right: 16px;
-  bottom: calc(16px + var(--safe-bottom) + var(--vv-bottom));
+  /* Extra bottom margin so the button clears Chrome's bottom-toolbar
+     navigation buttons that visualViewport doesn't always inset for. */
+  bottom: calc(36px + var(--safe-bottom) + var(--vv-bottom));
   width: 60px;
   height: 60px;
   border-radius: 50%;
