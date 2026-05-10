@@ -864,6 +864,15 @@ function wireUi() {
   });
 
   $("#fab").addEventListener("click", () => openSheet(null));
+
+  $("#zoom-in").addEventListener("click", () => {
+    if (!state.map) return;
+    state.map.setZoom((state.map.getZoom() || MAP_ZOOM) + 1);
+  });
+  $("#zoom-out").addEventListener("click", () => {
+    if (!state.map) return;
+    state.map.setZoom((state.map.getZoom() || MAP_ZOOM) - 1);
+  });
   $("#sheet-close").addEventListener("click", closeSheet);
   $("#f-cancel").addEventListener("click", closeSheet);
   $("#sheet-backdrop").addEventListener("click", closeSheet);
