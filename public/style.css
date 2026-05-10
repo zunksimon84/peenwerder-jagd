@@ -610,6 +610,9 @@ body {
   z-index: 21;
   background: var(--card);
   border-radius: 16px;
+  /* Lime accent strip across the top edge — same Brenneke green used
+     in the topbar, ties the modal to the brand. */
+  border-top: 4px solid var(--green-bright);
   padding: 0 20px calc(20px + var(--safe-bottom));
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
   left: 12px;
@@ -621,6 +624,28 @@ body {
   max-height: calc(100vh - var(--safe-top) - var(--vv-top) - var(--vv-bottom) - 36px);
   overflow-y: auto;
   animation: slideUp 0.2s ease-out;
+  isolation: isolate;
+}
+
+/* Mirrored wild-boar watermark anchored at the right edge — body
+   extends past the right, head pokes into the modal. Same line-art
+   treatment as the leaderboard. */
+#strecke-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("boar-flipped.png") no-repeat;
+  background-position: calc(100% + 30px) bottom 70px;
+  background-size: auto 220px;
+  opacity: 0.07;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+#strecke-modal > * {
+  position: relative;
+  z-index: 1;
 }
 
 @media (min-width: 720px) {
@@ -715,9 +740,15 @@ body {
 }
 
 #strecke-list li .count {
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--green-dark);
+  color: #111;
+  background: var(--green-bright);
+  border: 1px solid var(--green-bright-edge);
+  border-radius: 999px;
+  padding: 2px 12px;
+  min-width: 36px;
+  text-align: center;
 }
 
 #strecke-list .empty {
@@ -731,16 +762,20 @@ body {
 .timeline {
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--steel);
 }
 
 .timeline h3 {
   margin: 0 0 8px;
   font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
+  font-weight: 700;
+  color: var(--steel-dark);
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.7px;
+}
+
+.timeline-axis {
+  color: var(--steel-dark);
 }
 
 .timeline svg {
