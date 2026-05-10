@@ -1002,7 +1002,15 @@ async function openStrecke() {
       head.appendChild(count);
       li.appendChild(head);
       // One sub-line per gender, each with its own AK distribution.
-      for (const line of genderAgeLines(row.by_gender)) {
+      // Falls back to a single combined line if the backend is still
+      // returning the old gender/age shape (i.e. not yet redeployed).
+      const lines = row.by_gender
+        ? genderAgeLines(row.by_gender)
+        : (() => {
+            const text = breakdownText(row.gender, row.age);
+            return text ? [text] : [];
+          })();
+      for (const line of lines) {
         const subEl = document.createElement("div");
         subEl.className = "strecke-sub";
         subEl.textContent = line;
