@@ -80,7 +80,10 @@ function strecke_(params) {
   const to = toIso ? new Date(toIso) : null;
 
   const rows = readHarvests_();
-  const buckets = {}; // species → {count, gender:{m,w,unknown}, age:{0..4,unknown}}
+  const buckets = {}; // species → { count, by_gender: { m: {count,age{...}}, w, unknown } }
+  function emptyAge() {
+    return { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, unknown: 0 };
+  }
   let total = 0;
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -94,25 +97,27 @@ function strecke_(params) {
     if (!buckets[sp]) {
       buckets[sp] = {
         count: 0,
-        gender: { m: 0, w: 0, unknown: 0 },
-        age: { "0": 0, "1": 0, "2": 0, "3": 0, "4": 0, unknown: 0 },
+        by_gender: {
+          m: { count: 0, age: emptyAge() },
+          w: { count: 0, age: emptyAge() },
+          unknown: { count: 0, age: emptyAge() },
+        },
       };
     }
     const b = buckets[sp];
     b.count += n;
     total += n;
     const g = safeStr_(r.gender).toLowerCase();
-    if (g === "m") b.gender.m += n;
-    else if (g === "w") b.gender.w += n;
-    else b.gender.unknown += n;
+    const gKey = g === "m" ? "m" : g === "w" ? "w" : "unknown";
+    b.by_gender[gKey].count += n;
     const a = safeStr_(r.age_class);
-    if (a === "0" || a === "1" || a === "2" || a === "3" || a === "4") b.age[a] += n;
-    else b.age.unknown += n;
+    const aKey = (a === "0" || a === "1" || a === "2" || a === "3" || a === "4") ? a : "unknown";
+    b.by_gender[gKey].age[aKey] += n;
   }
   const by_species = Object.keys(buckets)
     .map(function (sp) {
       const b = buckets[sp];
-      return { species: sp, count: b.count, gender: b.gender, age: b.age };
+      return { species: sp, count: b.count, by_gender: b.by_gender };
     })
     .sort(function (a, b) { return b.count - a.count; });
 

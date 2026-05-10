@@ -1001,11 +1001,11 @@ async function openStrecke() {
       head.appendChild(name);
       head.appendChild(count);
       li.appendChild(head);
-      const sub = breakdownText(row.gender, row.age);
-      if (sub) {
+      // One sub-line per gender, each with its own AK distribution.
+      for (const line of genderAgeLines(row.by_gender)) {
         const subEl = document.createElement("div");
         subEl.className = "strecke-sub";
-        subEl.textContent = sub;
+        subEl.textContent = line;
         li.appendChild(subEl);
       }
       list.appendChild(li);
@@ -1033,6 +1033,35 @@ function breakdownText(gender, age) {
     if (akParts.length) parts.push(akParts.join(", "));
   }
   return parts.join(" · ");
+}
+
+// Render one line per gender with its own AK distribution, e.g.
+//   "♂ 7 · AK1 3, AK2 4"
+//   "♀ 5 · AK0 2, AK2 3"
+// Genders with zero count are skipped. AK0..4 with zero count are
+// skipped within a gender's line. Unknown-AK count is shown as "?" only
+// if there's also some known AK on that line — otherwise the line just
+// shows "♂ 7" without a colon.
+function genderAgeLines(by_gender) {
+  if (!by_gender) return [];
+  const order = ["m", "w", "unknown"];
+  const labels = { m: "♂", w: "♀", unknown: "?" };
+  const lines = [];
+  for (const g of order) {
+    const data = by_gender[g];
+    if (!data || !data.count) continue;
+    const knownAks = [];
+    for (const k of ["0", "1", "2", "3", "4"]) {
+      if (data.age[k] > 0) knownAks.push("AK" + k + " " + data.age[k]);
+    }
+    let akText = "";
+    if (knownAks.length) {
+      akText = " · " + knownAks.join(", ");
+      if (data.age.unknown > 0) akText += ", ? " + data.age.unknown;
+    }
+    lines.push(labels[g] + " " + data.count + akText);
+  }
+  return lines;
 }
 
 function closeStrecke() {
