@@ -582,17 +582,13 @@ async function loadHistory(postId) {
       const speciesParts = Object.entries(g.bySpecies).map(([sp, info]) =>
         `<strong>${escapeHtml(sp)}</strong> ×${info.count}`
       );
-      const head =
+      // Bare-minimum row: date, species + count, hunter. Wind, gender
+      // and age class are intentionally omitted here — full breakdown
+      // lives in the Strecke popup, while this list stays scannable.
+      li.innerHTML =
         `<span class="when">${when}</span>` +
         speciesParts.join(", ") +
-        ` <span class="who">${escapeHtml(g.hunter)}</span>` +
-        windHtml(g.wind_speed, g.wind_dir);
-      // Gender only in the per-post history list; age classes would
-      // crowd the line. Full age+gender breakdown stays in the
-      // Strecke popup.
-      const breakdown = breakdownText(g.gender, null);
-      li.innerHTML = `<div>${head}</div>` +
-        (breakdown ? `<div class="hist-sub">${breakdown}</div>` : "");
+        ` <span class="who">${escapeHtml(g.hunter)}</span>`;
       listEl.appendChild(li);
     }
   } catch (err) {
