@@ -161,10 +161,10 @@ body {
   position: fixed;
   /* Pulled in from the right edge so it stops overlapping Google
      Maps' native zoom +/- controls. */
-  right: 46px;
+  right: 60px;
   /* Extra bottom margin so the button clears Chrome's bottom-toolbar
      navigation buttons that visualViewport doesn't always inset for. */
-  bottom: calc(66px + var(--safe-bottom) + var(--vv-bottom));
+  bottom: calc(50px + var(--safe-bottom) + var(--vv-bottom));
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -637,7 +637,7 @@ body {
   position: absolute;
   inset: 0;
   background: url("roebuck.png") no-repeat;
-  background-position: calc(100% + 30px) bottom 50px;
+  background-position: calc(100% + 30px) 75%;
   background-size: auto 320px;
   opacity: 0.20;
   pointer-events: none;
