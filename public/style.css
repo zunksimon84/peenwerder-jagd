@@ -159,7 +159,9 @@ body {
 
 #fab {
   position: fixed;
-  right: 16px;
+  /* Pulled in 20px from the right edge so it stops overlapping Google
+     Maps' native zoom +/- controls. */
+  right: 36px;
   /* Extra bottom margin so the button clears Chrome's bottom-toolbar
      navigation buttons that visualViewport doesn't always inset for. */
   bottom: calc(66px + var(--safe-bottom) + var(--vv-bottom));
