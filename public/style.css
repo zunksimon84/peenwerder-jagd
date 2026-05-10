@@ -235,8 +235,10 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: url("boar.png") right center / auto 110% no-repeat;
-  opacity: 0.14;
+  /* Anchored slightly off the left edge so the boar appears to be
+     stepping into the chip — body partly cropped, full head visible. */
+  background: url("boar.png") -16px center / auto 85% no-repeat;
+  opacity: 0.16;
   pointer-events: none;
   z-index: 0;
   border-radius: inherit;
