@@ -582,13 +582,14 @@ async function loadHistory(postId) {
       const speciesParts = Object.entries(g.bySpecies).map(([sp, info]) =>
         `<strong>${escapeHtml(sp)}</strong> ×${info.count}`
       );
-      // Bare-minimum row: date, species + count, hunter. Wind, gender
-      // and age class are intentionally omitted here — full breakdown
-      // lives in the Strecke popup, while this list stays scannable.
+      // Bare row: date, species + count, hunter, wind. Gender and age
+      // class are intentionally omitted — full breakdown lives in the
+      // Strecke popup. Wind stays because it's actionable info.
       li.innerHTML =
         `<span class="when">${when}</span>` +
         speciesParts.join(", ") +
-        ` <span class="who">${escapeHtml(g.hunter)}</span>`;
+        ` <span class="who">${escapeHtml(g.hunter)}</span>` +
+        windHtml(g.wind_speed, g.wind_dir);
       listEl.appendChild(li);
     }
   } catch (err) {
