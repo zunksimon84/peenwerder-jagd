@@ -186,6 +186,9 @@ function initMap() {
     streetViewControl: false,
     fullscreenControl: false,
     gestureHandling: "greedy",
+    // Use Google's native +/- zoom widget — handles its own positioning
+    // and is mobile-friendly on touch.
+    zoomControl: true,
   });
   // OverlayView.draw() auto-fires on zoom/pan, so the heatmap recomputes
   // canvas size + zoom-aware radius without us listening explicitly.
@@ -864,15 +867,6 @@ function wireUi() {
   });
 
   $("#fab").addEventListener("click", () => openSheet(null));
-
-  $("#zoom-in").addEventListener("click", () => {
-    if (!state.map) return;
-    state.map.setZoom((state.map.getZoom() || MAP_ZOOM) + 1);
-  });
-  $("#zoom-out").addEventListener("click", () => {
-    if (!state.map) return;
-    state.map.setZoom((state.map.getZoom() || MAP_ZOOM) - 1);
-  });
   $("#sheet-close").addEventListener("click", closeSheet);
   $("#f-cancel").addEventListener("click", closeSheet);
   $("#sheet-backdrop").addEventListener("click", closeSheet);
