@@ -983,6 +983,11 @@ function setupProtocolFigure(fig) {
   const ctx = canvas.getContext("2d");
   const circles = []; // fractional coords {xr, yr} so they survive resizing
   let dpr = 1;
+  // The animal-pose strip wants a tiny pinpoint; the range diagram is
+  // smaller on screen, so it gets a slightly larger dot to stay visible.
+  const isAnimals = fig.dataset.fig === "animals";
+  const dotMinPx = isAnimals ? 2 : 3.5;
+  const dotFrac = isAnimals ? 0.005 : 0.009;
 
   function resize() {
     const rect = fig.getBoundingClientRect();
@@ -994,7 +999,7 @@ function setupProtocolFigure(fig) {
   }
   function redraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const radius = Math.max(2 * dpr, canvas.width * 0.005);
+    const radius = Math.max(dotMinPx * dpr, canvas.width * dotFrac);
     for (const c of circles) {
       const x = c.xr * canvas.width;
       const y = c.yr * canvas.height;
