@@ -1082,19 +1082,46 @@ function loadScriptOnce(src) {
   });
 }
 
-// Snapshot the filled-in protocol sheet to a single-page PDF and return
-// just the base64 payload (no data: prefix). Libraries are lazy-loaded.
+// Snapshot the filled-in protocol sheet to a multi-page A4 PDF (same layout
+// as printing) and return just the base64 payload (no data: prefix).
+// Libraries are lazy-loaded. The `.exporting` class temporarily un-clips the
+// modal and lays it out at a fixed document width so html2canvas captures the
+// whole form, not just the part scrolled into view.
 async function generateProtocolPdf() {
   await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
   await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  const modal = $("#protocol-modal");
   const el = $("#protocol-sheet");
-  const canvas = await window.html2canvas(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
-  const imgData = canvas.toDataURL("image/jpeg", 0.82);
+  let canvas;
+  modal.classList.add("exporting");
+  try {
+    void modal.offsetHeight;             // force the reflow before measuring
+    protoFigures.forEach((f) => f.resize()); // re-render dot overlays at the new width
+    canvas = await window.html2canvas(el, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      windowWidth: 800,
+    });
+  } finally {
+    modal.classList.remove("exporting");
+    void modal.offsetHeight;
+    protoFigures.forEach((f) => f.resize());
+  }
+
+  const imgData = canvas.toDataURL("image/jpeg", 0.92);
   const JsPDF = window.jspdf.jsPDF;
-  const pdfW = 595; // A4 width, pt
-  const pdfH = pdfW * (canvas.height / canvas.width);
-  const pdf = new JsPDF({ unit: "pt", format: [pdfW, pdfH] });
-  pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+  const pdf = new JsPDF({ unit: "pt", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgH = pageW * (canvas.height / canvas.width);
+  pdf.addImage(imgData, "JPEG", 0, 0, pageW, imgH);
+  let offset = pageH;
+  while (offset < imgH - 1) {
+    pdf.addPage();
+    pdf.addImage(imgData, "JPEG", 0, -offset, pageW, imgH);
+    offset += pageH;
+  }
   return pdf.output("datauristring").split(",")[1];
 }
 

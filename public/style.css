@@ -1298,6 +1298,28 @@ body {
   .protocol-body { overflow: visible; }
 }
 
+/* Off-screen, un-clipped layout used while rendering the e-mail PDF so the
+   capture is the whole form (laid out at a fixed page-ish width), matching
+   what you get from Drucken — not a clipped screenshot of the scroll area. */
+#protocol-modal.exporting {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  width: 800px;
+  height: auto;
+  max-height: none;
+  display: block;
+  overflow: visible;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+}
+#protocol-modal.exporting > header,
+#protocol-modal.exporting .proto-actions { display: none !important; }
+#protocol-modal.exporting .protocol-body { overflow: visible; height: auto; }
+
 #toast {
   position: fixed;
   left: 50%;
