@@ -12,6 +12,7 @@ const state = {
   map: null,
   heatOverlay: null,     // heatmap.js OverlayView wrapper
   markers: new Map(),    // post_id → marker
+  nachsucheMarkers: new Map(), // nachsuche id → { marker, timer }
   selectedPostId: null,
   filters: { species: "", range: "season", customDate: "" },
 };
@@ -33,6 +34,7 @@ async function main() {
     await bootstrap();
     renderMarkers();
     await refreshAggregates();
+    loadNachsuchen(); // fire-and-forget — flashing skull markers for open Nachsuchen
     wireUi();
   } catch (err) {
     console.error(err);
@@ -882,6 +884,7 @@ function wireUi() {
   $("#protocol-close").addEventListener("click", closeProtocol);
   $("#proto-close-bottom").addEventListener("click", closeProtocol);
   $("#protocol-backdrop").addEventListener("click", closeProtocol);
+  $("#proto-submit").addEventListener("click", submitProtocol);
   $("#proto-print").addEventListener("click", () => window.print());
   $("#proto-reset").addEventListener("click", resetProtocol);
   window.addEventListener("resize", () => {
@@ -1012,6 +1015,176 @@ function resetProtocol() {
     else inp.value = "";
   });
   protoFigures.forEach((f) => f.clear());
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Skript konnte nicht geladen werden: " + src));
+    document.head.appendChild(s);
+  });
+}
+
+// Snapshot the filled-in protocol sheet to a single-page PDF and return
+// just the base64 payload (no data: prefix). Libraries are lazy-loaded.
+async function generateProtocolPdf() {
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  const el = $("#protocol-sheet");
+  const canvas = await window.html2canvas(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+  const imgData = canvas.toDataURL("image/jpeg", 0.82);
+  const JsPDF = window.jspdf.jsPDF;
+  const pdfW = 595; // A4 width, pt
+  const pdfH = pdfW * (canvas.height / canvas.width);
+  const pdf = new JsPDF({ unit: "pt", format: [pdfW, pdfH] });
+  pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+  return pdf.output("datauristring").split(",")[1];
+}
+
+function protoField(key) {
+  const el = $(`#protocol-modal [data-proto="${key}"]`);
+  if (!el) return "";
+  return el.type === "checkbox" ? (el.checked ? "ja" : "") : String(el.value || "").trim();
+}
+
+async function submitProtocol() {
+  const btn = $("#proto-submit");
+  btn.disabled = true;
+  try {
+    const standNr = protoField("stand_nr");
+    const hunter = protoField("name") || protoField("nsf_name") || "?";
+    const recipient = protoField("recipient");
+    const parts = [];
+    if (protoField("s1_wildart")) parts.push(protoField("s1_wildart"));
+    if (protoField("s1_uhrzeit")) parts.push(protoField("s1_uhrzeit") + " Uhr");
+    if (protoField("s1_schuesse")) parts.push(protoField("s1_schuesse") + " Schuss");
+    if (protoField("s1_beob")) parts.push(protoField("s1_beob"));
+    const summary = parts.join(" · ").slice(0, 240);
+
+    const wantEmail = recipient && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient);
+    let pdf_base64 = "";
+    if (wantEmail) {
+      showToast("PDF wird erstellt …", null, 6000);
+      pdf_base64 = await generateProtocolPdf();
+    }
+
+    const res = await fetch(cfg.APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "nachsuche-create",
+        token: localStorage.getItem("preye.token") || "",
+        hunter,
+        stand_nr: standNr,
+        summary,
+        recipient,
+        pdf_base64,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || "Fehler beim Melden");
+
+    let msg = "Nachsuche gemeldet ✓";
+    if (data.emailed) msg += " · E-Mail versendet";
+    else if (wantEmail) msg += " · E-Mail fehlgeschlagen";
+    if (!data.post_found) msg += " · Stand nicht gefunden (kein Kartenmarker)";
+    showToast(msg, data.post_found ? null : "error", 5500);
+    closeProtocol();
+    loadNachsuchen();
+  } catch (err) {
+    showToast(err.message || String(err), "error", 5500);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------------- Nachsuche markers ----------------
+
+let nsInfoWindow = null;
+
+function addNachsucheMarker(ns) {
+  if (!Number.isFinite(ns.lat) || !Number.isFinite(ns.lng)) return;
+  const iconAt = (scale, fillOpacity) => ({
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor: "#ffd400",
+    fillOpacity: fillOpacity,
+    strokeColor: "#1a1a1a",
+    strokeWeight: 2.2,
+    scale: scale,
+  });
+  const marker = new google.maps.Marker({
+    position: { lat: ns.lat, lng: ns.lng },
+    map: state.map,
+    icon: iconAt(16, 1),
+    label: { text: "☠", fontSize: "15px", color: "#1a1a1a", fontWeight: "bold" },
+    zIndex: 100000,
+    title: "Nachsuche läuft — " + (ns.summary || ns.post_name || ""),
+  });
+  let pulse = true;
+  const timer = setInterval(() => {
+    pulse = !pulse;
+    marker.setIcon(iconAt(pulse ? 17 : 12, pulse ? 1 : 0.45));
+  }, 520);
+  marker.addListener("click", () => openNachsuchePopup(ns, marker, timer));
+  state.nachsucheMarkers.set(ns.id, { marker, timer });
+}
+
+function openNachsuchePopup(ns, marker, timer) {
+  if (nsInfoWindow) nsInfoWindow.close();
+  const div = document.createElement("div");
+  div.className = "ns-popup";
+  const created = ns.created_at
+    ? new Intl.DateTimeFormat("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(ns.created_at))
+    : "";
+  div.innerHTML =
+    `<strong>⚠ Nachsuche läuft</strong><br>` +
+    (ns.post_name ? `Stand: ${escapeHtml(ns.post_name)}<br>` : (ns.stand_nr ? `Stand-Nr.: ${escapeHtml(ns.stand_nr)}<br>` : "")) +
+    `Jäger: ${escapeHtml(ns.hunter || "?")}<br>` +
+    (created ? `<span class="muted">gemeldet ${created}</span><br>` : "") +
+    (ns.summary ? `<span class="muted">${escapeHtml(ns.summary)}</span><br>` : "") +
+    `<button type="button" class="ns-close-btn">Nachsuche abgeschlossen</button>`;
+  nsInfoWindow = new google.maps.InfoWindow({ content: div });
+  nsInfoWindow.open(state.map, marker);
+  div.querySelector(".ns-close-btn").addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    try {
+      const res = await fetch(cfg.APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "nachsuche-close", id: ns.id, token: localStorage.getItem("preye.token") || "" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Fehler");
+      nsInfoWindow.close();
+      clearInterval(timer);
+      marker.setMap(null);
+      state.nachsucheMarkers.delete(ns.id);
+      showToast("Nachsuche abgeschlossen ✓");
+    } catch (err) {
+      showToast(err.message || String(err), "error", 4000);
+      e.target.disabled = false;
+    }
+  });
+}
+
+async function loadNachsuchen() {
+  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) return;
+  for (const [, v] of state.nachsucheMarkers) {
+    clearInterval(v.timer);
+    v.marker.setMap(null);
+  }
+  state.nachsucheMarkers.clear();
+  try {
+    const res = await fetch(backendUrl("nachsuche-list"));
+    if (!res.ok) return;
+    const list = await res.json();
+    if (Array.isArray(list)) for (const ns of list) addNachsucheMarker(ns);
+  } catch (err) {
+    console.warn("nachsuche-list failed:", err);
+  }
 }
 
 // ---------------- Toast ----------------

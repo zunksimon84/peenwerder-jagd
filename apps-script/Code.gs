@@ -20,11 +20,13 @@ const SHEETS = {
   posts: "posts",
   hunters: "hunters",
   harvests: "harvests",
+  nachsuchen: "nachsuchen",
 };
 
 const POST_HEADER = ["id", "name", "area", "lat", "lng"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
+const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
 
 // ---------- HTTP entrypoints ----------
 
@@ -44,6 +46,7 @@ function doGet(e) {
     if (action === "sync") return json_(syncPostsFromKml());
     if (action === "history") return json_(history_(params));
     if (action === "strecke") return json_(strecke_(params));
+    if (action === "nachsuche-list") return json_(nachsucheList_());
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -56,6 +59,16 @@ function doPost(e) {
     if (!checkToken_(body.token)) {
       return json_({ error: "private", code: "AUTH_REQUIRED" });
     }
+    const action = body.action || "harvest";
+    if (action === "nachsuche-create") {
+      const r = nachsucheCreate_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "nachsuche-close") {
+      const r = nachsucheClose_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    // default — log a harvest
     const result = logHarvest_(body);
     return json_(result, result.error ? 400 : 200);
   } catch (err) {
@@ -856,6 +869,133 @@ function installStatsTrigger() {
   }
   // 02:00 daily — after the season-archive trigger at 01:00.
   ScriptApp.newTrigger("rebuildStats").timeBased().atHour(2).everyDays(1).create();
+}
+
+// ---------- Nachsuche (pending wounded-game tracking) ----------
+// An Anschuss-Protokoll submitted from the app creates an open Nachsuche
+// record. The frontend shows a flashing skull marker at the associated
+// Stand until someone marks it closed. If a recipient email + PDF were
+// supplied, the PDF is mailed from the script owner's Gmail.
+
+function nachsucheList_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, SHEETS.nachsuchen, NACHSUCHE_HEADER);
+  const rows = readSheet_(SHEETS.nachsuchen, NACHSUCHE_HEADER);
+  const posts = readPosts_();
+  const postMap = {};
+  for (let i = 0; i < posts.length; i++) postMap[posts[i].id] = posts[i];
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (String(r.status || "open").toLowerCase() === "closed") continue;
+    const post = postMap[String(r.post_id || "")];
+    if (!post || !Number.isFinite(post.lat) || !Number.isFinite(post.lng)) continue;
+    const ts = new Date(r.created_at);
+    out.push({
+      id: String(r.id),
+      created_at: isNaN(ts) ? null : ts.toISOString(),
+      hunter: String(r.hunter || ""),
+      stand_nr: String(r.stand_nr || ""),
+      post_id: String(r.post_id || ""),
+      post_name: String(post.name || ""),
+      summary: String(r.summary || ""),
+      lat: post.lat,
+      lng: post.lng,
+    });
+  }
+  return out;
+}
+
+// Map a "Stand-Nr." string ("13", "Nr. 13", "HR-13", "13a", "DJB 63")
+// to a posts-tab row.
+function resolveStandToPost_(standNr) {
+  const s = String(standNr || "").trim();
+  if (!s) return null;
+  const posts = readPosts_();
+  for (let i = 0; i < posts.length; i++) {
+    if (posts[i].id.toLowerCase() === s.toLowerCase()) return posts[i];
+  }
+  const numMatch = s.match(/(\d+[a-z]?)/i);
+  if (numMatch) {
+    const num = numMatch[1].toLowerCase();
+    for (let i = 0; i < posts.length; i++) {
+      const p = posts[i];
+      const nameNum = String(p.name).match(/^(?:Nr\.?|DJB)\s*(\d+[a-z]?)/i);
+      if (nameNum && nameNum[1].toLowerCase() === num) return p;
+      const idTail = String(p.id).split("-").pop().toLowerCase();
+      if (idTail === num) return p;
+    }
+  }
+  return null;
+}
+
+function nachsucheCreate_(body) {
+  const hunter = String(body.hunter || "").trim() || "?";
+  const standNr = String(body.stand_nr || "").trim();
+  const summary = String(body.summary || "").trim().slice(0, 240);
+  const recipient = String(body.recipient || "").trim();
+  const post = resolveStandToPost_(standNr);
+  const postId = post ? post.id : "";
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.nachsuchen, NACHSUCHE_HEADER);
+  const id = "NS-" + Date.now().toString(36).toUpperCase();
+  appendByName_(sheet, {
+    id: id,
+    created_at: new Date().toISOString(),
+    hunter: hunter,
+    stand_nr: standNr,
+    post_id: postId,
+    summary: summary,
+    status: "open",
+    closed_at: "",
+    recipient: recipient,
+  });
+
+  let emailed = false;
+  let emailError = "";
+  if (recipient && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) && body.pdf_base64) {
+    try {
+      const bytes = Utilities.base64Decode(body.pdf_base64);
+      const blob = Utilities.newBlob(bytes, "application/pdf", "anschuss-protokoll.pdf");
+      MailApp.sendEmail({
+        to: recipient,
+        subject: "Anschuss-Protokoll — Nachsuche" + (standNr ? " (Stand " + standNr + ")" : ""),
+        body: "Hallo,\n\nanbei das Anschuss-Protokoll von " + hunter + "." +
+          (summary ? "\n\n" + summary : "") +
+          "\n\n— automatisch versendet aus Pray (Peenwerder Jagd)",
+        attachments: [blob],
+      });
+      emailed = true;
+    } catch (err) {
+      emailError = String(err && err.message || err);
+    }
+  }
+  return { ok: true, id: id, post_id: postId, post_found: !!post, emailed: emailed, email_error: emailError };
+}
+
+function nachsucheClose_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.nachsuchen, NACHSUCHE_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: "not found" };
+  const header = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const idCol = header.indexOf("id") + 1;
+  const statusCol = header.indexOf("status") + 1;
+  const closedCol = header.indexOf("closed_at") + 1;
+  if (!idCol || !statusCol) return { error: "schema" };
+  const ids = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === id) {
+      sheet.getRange(i + 2, statusCol).setValue("closed");
+      if (closedCol) sheet.getRange(i + 2, closedCol).setValue(new Date().toISOString());
+      return { ok: true };
+    }
+  }
+  return { error: "not found" };
 }
 
 // ---------- Privacy / access control ----------

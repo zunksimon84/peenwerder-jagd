@@ -283,9 +283,15 @@
           <label><span>Nachsuchenführer:</span><input data-proto="nsf_name" /></label>
           <label><span>Bemerkungen NSF:</span><input data-proto="nsf_bem" /></label>
         </div>
+        <label class="proto-email">
+          E-Mail (Protokoll als PDF senden — optional):
+          <input type="email" data-proto="recipient" inputmode="email" autocomplete="email"
+                 placeholder="empfaenger@beispiel.de" />
+        </label>
       </div>
       <div class="proto-actions">
-        <button type="button" id="proto-print">Drucken</button>
+        <button type="button" id="proto-submit">Nachsuche melden</button>
+        <button type="button" id="proto-print" class="cancel-btn">Drucken</button>
         <button type="button" id="proto-reset" class="cancel-btn">Zurücksetzen</button>
         <button type="button" id="proto-close-bottom" class="cancel-btn">Schließen</button>
       </div>
