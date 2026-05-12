@@ -994,12 +994,16 @@ function setupProtocolFigure(fig) {
   }
   function redraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#e00000";
-    ctx.lineWidth = Math.max(2 * dpr, canvas.width * 0.006);
-    const radius = Math.max(10 * dpr, canvas.width * 0.022);
+    const radius = Math.max(3.5 * dpr, canvas.width * 0.009);
     for (const c of circles) {
+      const x = c.xr * canvas.width;
+      const y = c.yr * canvas.height;
       ctx.beginPath();
-      ctx.arc(c.xr * canvas.width, c.yr * canvas.height, radius, 0, Math.PI * 2);
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#e00000";
+      ctx.fill();
+      ctx.lineWidth = Math.max(1 * dpr, radius * 0.35);
+      ctx.strokeStyle = "rgba(255,255,255,0.92)";
       ctx.stroke();
     }
   }

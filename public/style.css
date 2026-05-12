@@ -993,6 +993,8 @@ body {
 }
 
 .proto-mode-btn.active { background: var(--green-bright); color: #111; }
+.proto-mode-btn.active[data-pmode="klettersitz"] { background: #03a9f4; color: #fff; }
+.proto-mode-btn.active[data-pmode="pirsch"] { background: #e2dc3a; color: #1f1f1f; }
 
 .proto-loc-row {
   display: flex;
