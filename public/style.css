@@ -110,35 +110,10 @@ body {
   gap: 6px;
 }
 
-.filters select {
-  background: #1a1a1a;
-  color: var(--green-bright);
-  border: 1px solid #1a1a1a;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 13px;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.filters select option {
-  color: #000;
-  background: #fff;
-}
-
-#filter-date {
-  background: #1a1a1a;
-  color: var(--green-bright);
-  border: 1px solid #1a1a1a;
-  border-radius: 999px;
-  padding: 5px 10px;
-  font: inherit;
-  font-size: 13px;
-  /* color-scheme dark hints the native picker to use a dark calendar
-     overlay that matches the chip on iOS / macOS. */
-  color-scheme: dark;
-}
-
+/* All four topbar chips (the two selects, the date picker, the two buttons)
+   share one pill format: dark fill, lime label, bold, lime outline on hover. */
+.filters select,
+#filter-date,
 .filter-btn {
   background: #1a1a1a;
   color: var(--green-bright);
@@ -150,10 +125,45 @@ body {
   font-weight: 600;
   letter-spacing: 0.3px;
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.12s, border-color 0.12s, transform 0.08s;
 }
 
+.filters select:hover,
+#filter-date:hover,
+.filter-btn:hover {
+  border-color: var(--green-bright);
+}
+
+.filters select:active,
+#filter-date:active,
 .filter-btn:active {
   transform: scale(0.96);
+}
+
+.filters select option {
+  color: #000;
+  background: #fff;
+  font-weight: 400;
+}
+
+#filter-date {
+  /* color-scheme dark hints the native picker to use a dark calendar
+     overlay that matches the chip on iOS / macOS. */
+  color-scheme: dark;
+}
+
+/* The Anschuss-Protokoll / Nachsuche trigger — same chip format but a cold
+   red so it reads as the "report a wounded animal" action, not a filter. */
+.filter-btn--alert {
+  background: #d11f3c;
+  border-color: #d11f3c;
+  color: #fff;
+}
+
+.filter-btn--alert:hover {
+  border-color: #fff;
 }
 
 #map {
