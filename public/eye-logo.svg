@@ -1,25 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 130">
-  <!-- Eye outline — fuller, more compact almond (≈1.6:1 width:height).
-       Control points sit outside the viewBox; the curve itself stays
-       inside. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 130">
+  <!-- Eye outline — wide almond (≈2.2:1), hollow ring. Control points
+       sit outside the viewBox; the curve itself stays inside. -->
   <path fill="currentColor" fill-rule="evenodd" d="
-    M 6 65
-    Q 80 -27 154 65
-    Q 80 157 6 65 Z
-    M 24 65
-    Q 80 13 136 65
-    Q 80 117 24 65 Z
+    M 8 65 Q 120 -37 232 65 Q 120 167 8 65 Z
+    M 26 65 Q 120 -1 214 65 Q 120 131 26 65 Z
   "/>
-  <!-- Iris ring (hollow circle) -->
-  <circle cx="80" cy="65" r="34" fill="none" stroke="currentColor" stroke-width="6.5"/>
-  <!-- Bullet — small, centred inside the iris -->
+  <!-- Iris ring — a touch smaller than the source artwork -->
+  <circle cx="120" cy="65" r="46" fill="none" stroke="currentColor" stroke-width="8"/>
+  <!-- Bullet (rifle cartridge + projectile), slightly smaller than the
+       source so it sits comfortably inside the iris -->
   <g fill="currentColor">
-    <!-- Cartridge body -->
-    <rect x="72" y="61.5" width="14" height="7"/>
-    <!-- Cartridge rim flange (two-step) -->
-    <rect x="69.5" y="59.5" width="2" height="11"/>
-    <rect x="67" y="60.5" width="2" height="9"/>
-    <!-- Projectile (rounded conical tip on the right) -->
-    <path d="M 86 61 L 90 61 Q 93.5 65 90 69 L 86 69 Z"/>
+    <!-- Rim flange (extractor groove) -->
+    <rect x="78" y="58" width="3" height="14"/>
+    <!-- Cartridge head / rim -->
+    <rect x="81" y="55.5" width="5" height="19"/>
+    <!-- Cartridge case body -->
+    <rect x="86" y="57" width="50" height="16"/>
+    <!-- Shoulder / neck step-down -->
+    <rect x="136" y="59" width="9" height="12"/>
+    <!-- Bullet ogive (curving from the neck to a rounded point) -->
+    <path d="M 145 59 L 153 59 C 160 59, 163 63, 163 65 C 163 67, 160 71, 153 71 L 145 71 Z"/>
   </g>
 </svg>
