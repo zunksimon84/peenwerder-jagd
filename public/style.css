@@ -1167,9 +1167,8 @@ body {
   -webkit-appearance: none;
   appearance: none;
 }
-/* Stacked just either side of the row divider so they read as a pair. */
 .proto-figure .proto-fig-row1 { top: calc(50% - 27px); }
-.proto-figure .proto-fig-row2 { top: calc(50% + 5px); }
+.proto-figure .proto-fig-row2 { bottom: 4px; }
 
 .proto-bottom {
   display: flex;

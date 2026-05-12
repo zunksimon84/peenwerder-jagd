@@ -979,6 +979,10 @@ function wireUi() {
 
 const protoFigures = []; // { resize, clear }
 
+function romanNumeral(n) {
+  return ["I", "II", "III", "IV", "V", "VI", "VII", "VIII"][n - 1] || String(n);
+}
+
 function setupProtocolFigure(fig) {
   const canvas = fig.querySelector("canvas");
   const ctx = canvas.getContext("2d");
@@ -1017,7 +1021,7 @@ function setupProtocolFigure(fig) {
       ctx.stroke();
       if (numbered) {
         ctx.fillStyle = "#fff";
-        ctx.fillText(String(i + 1), x, y);
+        ctx.fillText(romanNumeral(i + 1), x, y);
       }
     });
   }
