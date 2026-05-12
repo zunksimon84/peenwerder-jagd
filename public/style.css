@@ -1147,6 +1147,29 @@ body {
   touch-action: manipulation;
 }
 
+/* Per-row Stück selector overlaid on the left edge of the animal-pose chart
+   (top select → top row, bottom select → bottom row). */
+.proto-figure .proto-fig-row {
+  position: absolute;
+  left: 3px;
+  z-index: 3;
+  width: 36px;
+  height: auto;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 0;
+  text-align: center;
+  border: 1px solid var(--steel-dark);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--steel-dark);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.proto-figure .proto-fig-row1 { top: 4px; }
+.proto-figure .proto-fig-row2 { bottom: 4px; }
+
 .proto-bottom {
   display: flex;
   gap: 12px;

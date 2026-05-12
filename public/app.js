@@ -984,11 +984,12 @@ function setupProtocolFigure(fig) {
   const ctx = canvas.getContext("2d");
   const circles = []; // fractional coords {xr, yr} so they survive resizing
   let dpr = 1;
-  // The animal-pose strip wants a tiny pinpoint; the range diagram is
-  // smaller on screen, so it gets a slightly larger dot to stay visible.
-  const isAnimals = fig.dataset.fig === "animals";
-  const dotMinPx = isAnimals ? 2 : 3.5;
-  const dotFrac = isAnimals ? 0.005 : 0.009;
+  // animals: tiny pinpoint dots (the row dropdowns say which Stück a row is).
+  // range: larger dots that carry the placement order (1, 2, …) inside them.
+  const figKind = fig.dataset.fig;
+  const numbered = figKind === "range";
+  const dotMinPx = numbered ? 9 : 2;
+  const dotFrac = numbered ? 0.03 : 0.005;
 
   function resize() {
     const rect = fig.getBoundingClientRect();
@@ -1001,17 +1002,24 @@ function setupProtocolFigure(fig) {
   function redraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const radius = Math.max(dotMinPx * dpr, canvas.width * dotFrac);
-    for (const c of circles) {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold " + Math.round(radius * 1.25) + "px -apple-system, system-ui, sans-serif";
+    circles.forEach((c, i) => {
       const x = c.xr * canvas.width;
       const y = c.yr * canvas.height;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fillStyle = "#e00000";
       ctx.fill();
-      ctx.lineWidth = Math.max(0.75 * dpr, radius * 0.3);
-      ctx.strokeStyle = "rgba(255,255,255,0.92)";
+      ctx.lineWidth = Math.max(0.75 * dpr, radius * 0.22);
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
       ctx.stroke();
-    }
+      if (numbered) {
+        ctx.fillStyle = "#fff";
+        ctx.fillText(String(i + 1), x, y);
+      }
+    });
   }
   canvas.addEventListener("click", (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -1135,12 +1143,23 @@ function flattenFormControlsForPdf(clonedDoc) {
     const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
     const borV = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     const fontPx = parseFloat(cs.fontSize) || 13;
+    const abs = cs.position === "absolute" || cs.position === "fixed";
     const div = clonedDoc.createElement("div");
     div.textContent = text;
     div.style.boxSizing = "border-box";
-    div.style.width = "100%";
-    div.style.flex = "1 1 0%";
-    div.style.minWidth = "0";
+    if (abs) {
+      // e.g. the per-row Stück selectors overlaid on the animal chart — keep
+      // them where they are instead of letting them flow into the layout.
+      div.style.position = cs.position;
+      div.style.top = cs.top; div.style.left = cs.left;
+      div.style.right = cs.right; div.style.bottom = cs.bottom;
+      div.style.zIndex = cs.zIndex;
+      div.style.width = cs.width;
+    } else {
+      div.style.width = "100%";
+      div.style.flex = "1 1 0%";
+      div.style.minWidth = "0";
+    }
     // border-box min-height = one text line + the input's own padding + border,
     // so empty fields don't collapse and filled ones match the live height.
     div.style.minHeight = Math.round(fontPx * 1.4 + padV + borV) + "px";
@@ -1156,7 +1175,7 @@ function flattenFormControlsForPdf(clonedDoc) {
     div.style.fontWeight = cs.fontWeight;
     div.style.lineHeight = "1.4";
     div.style.color = cs.color || "#1f1f1f";
-    div.style.textAlign = (cs.textAlign === "start" || cs.textAlign === "") ? "left" : cs.textAlign;
+    div.style.textAlign = (cs.textAlign === "start" || cs.textAlign === "") ? (abs ? "center" : "left") : cs.textAlign;
     div.style.whiteSpace = "nowrap";
     div.style.overflow = "hidden";
     div.style.textOverflow = "ellipsis";
