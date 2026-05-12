@@ -1151,7 +1151,7 @@ body {
    (top select → top row, bottom select → bottom row). */
 .proto-figure .proto-fig-row {
   position: absolute;
-  left: 3px;
+  left: 16px;
   z-index: 3;
   width: 36px;
   height: auto;
@@ -1162,13 +1162,14 @@ body {
   text-align: center;
   border: 1px solid var(--steel-dark);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--steel-dark);
+  background: var(--steel);
+  color: #fff;
   -webkit-appearance: none;
   appearance: none;
 }
-.proto-figure .proto-fig-row1 { top: 4px; }
-.proto-figure .proto-fig-row2 { bottom: 4px; }
+/* Stacked just either side of the row divider so they read as a pair. */
+.proto-figure .proto-fig-row1 { top: calc(50% - 27px); }
+.proto-figure .proto-fig-row2 { top: calc(50% + 5px); }
 
 .proto-bottom {
   display: flex;
