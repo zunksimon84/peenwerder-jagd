@@ -911,6 +911,10 @@ body {
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
 }
 
+/* `display: flex` above outranks the UA's `[hidden] { display: none }`, so
+   without this the modal can never be closed via the hidden attribute. */
+#protocol-modal[hidden] { display: none; }
+
 #protocol-modal > header {
   display: flex;
   align-items: center;
