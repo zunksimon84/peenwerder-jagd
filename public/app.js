@@ -1161,10 +1161,15 @@ async function submitProtocol() {
     if (!res.ok || data.error) throw new Error(data.error || "Fehler beim Melden");
 
     let msg = "Nachsuche gemeldet ✓";
-    if (data.emailed) msg += " · E-Mail versendet";
-    else if (wantEmail) msg += " · E-Mail fehlgeschlagen";
-    if (!data.post_found) msg += " · Stand nicht gefunden (kein Kartenmarker)";
-    showToast(msg, data.post_found ? null : "error", 5500);
+    let isErr = false;
+    if (data.emailed) {
+      msg += " · E-Mail versendet";
+    } else if (wantEmail) {
+      msg += " · E-Mail fehlgeschlagen" + (data.email_error ? ": " + data.email_error : "");
+      isErr = true;
+    }
+    if (!data.post_found) { msg += " · Stand nicht gefunden (kein Kartenmarker)"; isErr = true; }
+    showToast(msg, isErr ? "error" : null, isErr ? 9000 : 5000);
     closeProtocol();
     loadNachsuchen();
   } catch (err) {

@@ -1051,6 +1051,25 @@ function onOpen() {
     .addItem("Posten neu klassifizieren", "menu_reclassifyPosts")
     .addItem("Verlorene Klettersitz/Pirsch-Posten anzeigen", "menu_listLostFreePosts")
     .addToUi();
+  ui.createMenu("📧 E-Mail")
+    .addItem("Test-E-Mail an mich senden", "menu_testEmail")
+    .addToUi();
+}
+
+// One-time check that the "send email as you" permission is granted and
+// delivery works. Run this from the menu (or the Run ▶ button) — it will
+// trigger the OAuth consent screen on first use, which is exactly the grant
+// the Anschuss-Protokoll's PDF mailer needs.
+function menu_testEmail() {
+  const ui = SpreadsheetApp.getUi();
+  const me = Session.getActiveUser().getEmail();
+  try {
+    MailApp.sendEmail(me, "PREYE — Test", "E-Mail-Versand funktioniert. " +
+      "Verbleibendes Tageskontingent: " + MailApp.getRemainingDailyQuota());
+    ui.alert("Gesendet an " + me + ".\nVerbleibendes Kontingent heute: " + MailApp.getRemainingDailyQuota());
+  } catch (err) {
+    ui.alert("Fehlgeschlagen: " + (err && err.message || err));
+  }
 }
 
 // Walk every row in the posts sheet and rename any whose ID prefix /
