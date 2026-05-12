@@ -52,6 +52,7 @@
         </select>
         <input id="filter-date" type="date" hidden aria-label="Datum auswählen" />
         <button id="strecke-btn" class="filter-btn" type="button">Strecke</button>
+        <button id="protocol-btn" class="filter-btn" type="button">Anschuss-Protokoll</button>
       </div>
     </header>
 
@@ -170,6 +171,124 @@
         </div>
       </div>
       <button type="button" id="strecke-close-bottom" class="cancel-btn">Schließen</button>
+    </section>
+
+    <div id="protocol-backdrop" hidden></div>
+    <section id="protocol-modal" hidden aria-modal="true" role="dialog" aria-labelledby="protocol-title">
+      <header>
+        <h2 id="protocol-title">Anschuss-Protokoll</h2>
+        <button id="protocol-close" aria-label="Schließen">×</button>
+      </header>
+      <div class="protocol-body" id="protocol-sheet">
+        <div class="proto-banner">
+          <span class="proto-banner-title">ANSCHUSS-PROTOKOLL</span>
+          <label class="proto-stand">Stand-Nr.<input type="text" data-proto="stand_nr" /></label>
+        </div>
+
+        <div class="proto-line">
+          <label class="grow">Name:<input type="text" data-proto="name" /></label>
+          <label class="grow">Telefon:<input type="text" data-proto="tel" /></label>
+        </div>
+        <div class="proto-line">
+          <label class="grow">Kaliber / Geschoss:<input type="text" data-proto="kaliber" /></label>
+          <label class="proto-chk"><input type="checkbox" data-proto="bleifrei" /> Bleifrei</label>
+          <label class="proto-chk"><input type="checkbox" data-proto="bleihaltig" /> Bleihaltig</label>
+        </div>
+
+        <table class="proto-table">
+          <thead>
+            <tr>
+              <th></th><th>Uhrzeit</th><th>Anzahl Schüsse</th><th>Wildart / geschätzte kg</th>
+              <th>Anzahl Stücke</th><th>Beobachtungen (gezeichnet, krank …)</th><th>von Hund(en) verfolgt</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Stück 1</td>
+              <td><input data-proto="s1_uhrzeit" /></td><td><input data-proto="s1_schuesse" /></td>
+              <td><input data-proto="s1_wildart" /></td><td><input data-proto="s1_stuecke" /></td>
+              <td><input data-proto="s1_beob" /></td><td><input data-proto="s1_hund" /></td>
+            </tr>
+            <tr>
+              <td>Stück 2</td>
+              <td><input data-proto="s2_uhrzeit" /></td><td><input data-proto="s2_schuesse" /></td>
+              <td><input data-proto="s2_wildart" /></td><td><input data-proto="s2_stuecke" /></td>
+              <td><input data-proto="s2_beob" /></td><td><input data-proto="s2_hund" /></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="proto-label">Stellung des Stückes beim Schuss — vermutlicher Sitz der Kugel mit Stück-Nr. kennzeichnen (tippen für roten Kreis, nochmal tippen zum Entfernen)</p>
+        <div class="proto-figure" data-fig="animals">
+          <img src="protocol-animals.png" alt="Wildposen" />
+          <canvas></canvas>
+        </div>
+
+        <p class="proto-label">Anschuss mit Stück-Nr., Fluchtrichtung und Blickrichtung einzeichnen</p>
+        <div class="proto-bottom">
+          <div class="proto-pirsch">
+            <div class="proto-pirsch-head">Gefundene Pirschzeichen zu Stück-Nr.</div>
+            <div class="proto-pirsch-block">
+              <strong>Stück 1</strong>
+              <div class="proto-pirsch-grid">
+                <label><input type="checkbox" data-proto="s1_schweiss" /> Schweiß</label>
+                <label><input type="checkbox" data-proto="s1_knochen" /> Knochen</label>
+                <label><input type="checkbox" data-proto="s1_schnitthaar" /> Schnitthaar</label>
+                <label><input type="checkbox" data-proto="s1_kugelriss" /> Kugelriss</label>
+                <label><input type="checkbox" data-proto="s1_gewebe" /> Gewebe</label>
+                <label><input type="checkbox" data-proto="s1_sonstiges" /> Sonstiges</label>
+              </div>
+              <label class="proto-bem">Bemerkung:<input data-proto="s1_bem" /></label>
+            </div>
+            <div class="proto-pirsch-block">
+              <strong>Stück 2</strong>
+              <div class="proto-pirsch-grid">
+                <label><input type="checkbox" data-proto="s2_schweiss" /> Schweiß</label>
+                <label><input type="checkbox" data-proto="s2_knochen" /> Knochen</label>
+                <label><input type="checkbox" data-proto="s2_schnitthaar" /> Schnitthaar</label>
+                <label><input type="checkbox" data-proto="s2_kugelriss" /> Kugelriss</label>
+                <label><input type="checkbox" data-proto="s2_gewebe" /> Gewebe</label>
+                <label><input type="checkbox" data-proto="s2_sonstiges" /> Sonstiges</label>
+              </div>
+              <label class="proto-bem">Bemerkung:<input data-proto="s2_bem" /></label>
+            </div>
+          </div>
+          <div class="proto-figure proto-range" data-fig="range">
+            <svg viewBox="0 0 300 300" aria-hidden="true">
+              <line x1="150" y1="14" x2="150" y2="286" stroke="#cfcfcf" stroke-width="0.6" />
+              <line x1="14" y1="150" x2="286" y2="150" stroke="#cfcfcf" stroke-width="0.6" />
+              <circle cx="150" cy="150" r="42" fill="none" stroke="#9a9a9a" stroke-width="1" />
+              <circle cx="150" cy="150" r="86" fill="none" stroke="#9a9a9a" stroke-width="1" />
+              <circle cx="150" cy="150" r="130" fill="none" stroke="#9a9a9a" stroke-width="1" />
+              <line x1="150" y1="36" x2="150" y2="14" stroke="#5a5a5a" stroke-width="1.6" />
+              <path d="M150 8 L146 18 L154 18 Z" fill="#5a5a5a" />
+              <text x="150" y="32" text-anchor="middle" font-size="11" fill="#5a5a5a">Blickrichtung</text>
+              <text x="106" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">30 m</text>
+              <text x="62" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">60 m</text>
+              <text x="18" y="146" text-anchor="end" font-size="9" fill="#8a8a8a">100 m</text>
+              <g stroke="#444" stroke-width="1.3" fill="none">
+                <path d="M141 150 L159 150 L156 158 L144 158 Z" fill="#444" />
+                <path d="M139 150 L150 142 L161 150" />
+                <line x1="146" y1="158" x2="142" y2="167" />
+                <line x1="154" y1="158" x2="158" y2="167" />
+                <line x1="147" y1="161" x2="153" y2="161" />
+              </g>
+            </svg>
+            <canvas></canvas>
+          </div>
+        </div>
+
+        <div class="proto-meldung">
+          <label><span>Meldung Nachsuchen an:</span><input data-proto="meldung" /></label>
+          <label><span>Nachsuchenführer:</span><input data-proto="nsf_name" /></label>
+          <label><span>Bemerkungen NSF:</span><input data-proto="nsf_bem" /></label>
+        </div>
+      </div>
+      <div class="proto-actions">
+        <button type="button" id="proto-print">Drucken</button>
+        <button type="button" id="proto-reset" class="cancel-btn">Zurücksetzen</button>
+        <button type="button" id="proto-close-bottom" class="cancel-btn">Schließen</button>
+      </div>
     </section>
 
     <div id="toast" hidden></div>

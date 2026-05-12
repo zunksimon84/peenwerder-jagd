@@ -877,6 +877,17 @@ function wireUi() {
   $("#strecke-close-bottom").addEventListener("click", closeStrecke);
   $("#strecke-backdrop").addEventListener("click", closeStrecke);
 
+  document.querySelectorAll(".proto-figure").forEach(setupProtocolFigure);
+  $("#protocol-btn").addEventListener("click", openProtocol);
+  $("#protocol-close").addEventListener("click", closeProtocol);
+  $("#proto-close-bottom").addEventListener("click", closeProtocol);
+  $("#protocol-backdrop").addEventListener("click", closeProtocol);
+  $("#proto-print").addEventListener("click", () => window.print());
+  $("#proto-reset").addEventListener("click", resetProtocol);
+  window.addEventListener("resize", () => {
+    if (!$("#protocol-modal").hidden) protoFigures.forEach((f) => f.resize());
+  });
+
   document.querySelectorAll(".counter button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const step = Number(btn.dataset.step);
@@ -936,6 +947,71 @@ function wireUi() {
       { enableHighAccuracy: true, timeout: 8000 }
     );
   });
+}
+
+// ---------------- Anschuss-Protokoll ----------------
+// A digital version of the German "shot protocol" form. Text fields +
+// checkboxes are plain inputs; the two figures (wild-pose strip and the
+// range diagram) get a transparent canvas overlay where tapping drops a
+// red circle (tap a circle again to remove it).
+
+const protoFigures = []; // { resize, clear }
+
+function setupProtocolFigure(fig) {
+  const canvas = fig.querySelector("canvas");
+  const ctx = canvas.getContext("2d");
+  const circles = []; // fractional coords {xr, yr} so they survive resizing
+  let dpr = 1;
+
+  function resize() {
+    const rect = fig.getBoundingClientRect();
+    if (!rect.width) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    redraw();
+  }
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#e00000";
+    ctx.lineWidth = Math.max(2 * dpr, canvas.width * 0.006);
+    const radius = Math.max(10 * dpr, canvas.width * 0.022);
+    for (const c of circles) {
+      ctx.beginPath();
+      ctx.arc(c.xr * canvas.width, c.yr * canvas.height, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  canvas.addEventListener("click", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width) return;
+    const xr = (e.clientX - rect.left) / rect.width;
+    const yr = (e.clientY - rect.top) / rect.height;
+    const hitIdx = circles.findIndex(
+      (c) => Math.hypot((c.xr - xr) * rect.width, (c.yr - yr) * rect.height) < 18
+    );
+    if (hitIdx >= 0) circles.splice(hitIdx, 1);
+    else circles.push({ xr, yr });
+    redraw();
+  });
+  protoFigures.push({ resize, clear: () => { circles.length = 0; redraw(); } });
+}
+
+function openProtocol() {
+  $("#protocol-backdrop").hidden = false;
+  $("#protocol-modal").hidden = false;
+  requestAnimationFrame(() => protoFigures.forEach((f) => f.resize()));
+}
+function closeProtocol() {
+  $("#protocol-modal").hidden = true;
+  $("#protocol-backdrop").hidden = true;
+}
+function resetProtocol() {
+  $("#protocol-modal").querySelectorAll("input").forEach((inp) => {
+    if (inp.type === "checkbox") inp.checked = false;
+    else inp.value = "";
+  });
+  protoFigures.forEach((f) => f.clear());
 }
 
 // ---------------- Toast ----------------
