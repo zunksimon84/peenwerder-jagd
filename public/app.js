@@ -880,6 +880,7 @@ function wireUi() {
   $("#strecke-backdrop").addEventListener("click", closeStrecke);
 
   document.querySelectorAll(".proto-figure").forEach(setupProtocolFigure);
+  fillRangeSelects();
   $("#protocol-btn").addEventListener("click", openProtocol);
   $("#protocol-close").addEventListener("click", closeProtocol);
   $("#proto-close-bottom").addEventListener("click", closeProtocol);
@@ -1062,10 +1063,35 @@ function closeProtocol() {
   $("#protocol-modal").hidden = true;
   $("#protocol-backdrop").hidden = true;
 }
+// Build the numeric dropdowns on the protocol (Schüsse 1–10, kg 1–100,
+// Stücke 1–15) from their data-range attribute. Runs once at startup.
+function fillRangeSelects() {
+  document.querySelectorAll("#protocol-modal select[data-range]").forEach((sel) => {
+    const m = /^(\d+)-(\d+)$/.exec(sel.dataset.range || "");
+    if (!m) return;
+    const lo = Number(m[1]);
+    const hi = Number(m[2]);
+    sel.innerHTML = "";
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "—";
+    sel.appendChild(blank);
+    for (let n = lo; n <= hi; n++) {
+      const o = document.createElement("option");
+      o.value = String(n);
+      o.textContent = String(n);
+      sel.appendChild(o);
+    }
+  });
+}
+
 function resetProtocol() {
   $("#protocol-modal").querySelectorAll("input").forEach((inp) => {
     if (inp.type === "checkbox") inp.checked = false;
     else inp.value = "";
+  });
+  $("#protocol-modal").querySelectorAll("select").forEach((sel) => {
+    sel.selectedIndex = 0;
   });
   protoFigures.forEach((f) => f.clear());
   setProtoMode("post");

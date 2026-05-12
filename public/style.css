@@ -1094,6 +1094,27 @@ body {
 .proto-table td:first-child { font-weight: 600; white-space: nowrap; background: var(--bg); }
 .proto-table td input { padding: 4px 3px; }
 
+/* Table cells are tiny — keep the dropdowns/time pickers compact and let
+   the <select>s show their native arrow so they read as pickable. */
+.proto-table td select,
+.proto-table td input[type="time"] {
+  width: 100%;
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  min-width: 0;
+  -webkit-appearance: auto;
+  appearance: auto;
+}
+
+/* The "Wildart / gesch. kg" cell holds two stacked controls. */
+.proto-cell-stack { padding: 3px; }
+.proto-cell-stack > * { display: block; width: 100%; }
+.proto-cell-stack > input { margin-bottom: 3px; }
+
 .proto-label {
   margin: 12px 0 4px;
   font-size: 11px;

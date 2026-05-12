@@ -53,8 +53,8 @@
         <input id="filter-date" type="date" hidden aria-label="Datum auswählen" />
         <button id="strecke-btn" class="filter-btn" type="button">Strecke</button>
         <button id="protocol-btn" class="filter-btn filter-btn--alert" type="button"
-                aria-label="Anschuss-Protokoll — Nachsuche melden"
-                title="Anschuss-Protokoll — Nachsuche melden">NS</button>
+                aria-label="Nachsuchen melden — Anschuss-Protokoll"
+                title="Nachsuchen melden — Anschuss-Protokoll ausfüllen">Nachsuchen melden</button>
       </div>
     </header>
 
@@ -221,22 +221,42 @@
         <table class="proto-table">
           <thead>
             <tr>
-              <th></th><th>Uhrzeit</th><th>Anzahl Schüsse</th><th>Wildart / geschätzte kg</th>
+              <th></th><th>Uhrzeit</th><th>Anzahl Schüsse</th><th>Wildart / gesch. kg</th>
               <th>Anzahl Stücke</th><th>Beobachtungen (gezeichnet, krank …)</th><th>von Hund(en) verfolgt</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td>Stück 1</td>
-              <td><input data-proto="s1_uhrzeit" /></td><td><input data-proto="s1_schuesse" /></td>
-              <td><input data-proto="s1_wildart" /></td><td><input data-proto="s1_stuecke" /></td>
-              <td><input data-proto="s1_beob" /></td><td><input data-proto="s1_hund" /></td>
+              <td><input type="time" data-proto="s1_uhrzeit" /></td>
+              <td><select data-proto="s1_schuesse" data-range="1-10"></select></td>
+              <td class="proto-cell-stack">
+                <input type="text" data-proto="s1_wildart" placeholder="Wildart" />
+                <select data-proto="s1_kg" data-range="1-100" aria-label="geschätzte kg"></select>
+              </td>
+              <td><select data-proto="s1_stuecke" data-range="1-15"></select></td>
+              <td><input data-proto="s1_beob" /></td>
+              <td>
+                <select data-proto="s1_hund" aria-label="von Hunden verfolgt">
+                  <option value="">—</option><option>Ja</option><option>Nein</option><option>Weiß nicht</option>
+                </select>
+              </td>
             </tr>
             <tr>
               <td>Stück 2</td>
-              <td><input data-proto="s2_uhrzeit" /></td><td><input data-proto="s2_schuesse" /></td>
-              <td><input data-proto="s2_wildart" /></td><td><input data-proto="s2_stuecke" /></td>
-              <td><input data-proto="s2_beob" /></td><td><input data-proto="s2_hund" /></td>
+              <td><input type="time" data-proto="s2_uhrzeit" /></td>
+              <td><select data-proto="s2_schuesse" data-range="1-10"></select></td>
+              <td class="proto-cell-stack">
+                <input type="text" data-proto="s2_wildart" placeholder="Wildart" />
+                <select data-proto="s2_kg" data-range="1-100" aria-label="geschätzte kg"></select>
+              </td>
+              <td><select data-proto="s2_stuecke" data-range="1-15"></select></td>
+              <td><input data-proto="s2_beob" /></td>
+              <td>
+                <select data-proto="s2_hund" aria-label="von Hunden verfolgt">
+                  <option value="">—</option><option>Ja</option><option>Nein</option><option>Weiß nicht</option>
+                </select>
+              </td>
             </tr>
           </tbody>
         </table>
