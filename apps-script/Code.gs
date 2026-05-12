@@ -931,13 +931,45 @@ function resolveStandToPost_(standNr) {
 
 function nachsucheCreate_(body) {
   const hunter = String(body.hunter || "").trim() || "?";
-  const standNr = String(body.stand_nr || "").trim();
   const summary = String(body.summary || "").trim().slice(0, 240);
   const recipient = String(body.recipient || "").trim();
-  const post = resolveStandToPost_(standNr);
-  const postId = post ? post.id : "";
-
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Resolve where the Nachsuche is. Three inputs, in priority order:
+  //   1. post_id     — a Kanzel picked from the dropdown (exact id)
+  //   2. free_location {lat,lng,label,kind} — Klettersitz/Pirsch; we
+  //      materialise it as a posts row exactly like logHarvest_ does
+  //   3. stand_nr    — legacy free-text Stand number, fuzzy-matched
+  let post = null;
+  let postId = String(body.post_id || "").trim();
+  if (postId) {
+    post = readPosts_().find(function (p) { return p.id === postId; }) || null;
+  }
+  if (!post && body.free_location) {
+    const free = body.free_location;
+    const lat = Number(free.lat);
+    const lng = Number(free.lng);
+    if (Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+        Number.isFinite(lng) && lng >= -180 && lng <= 180) {
+      const rawLabel = String(free.label || "").trim().slice(0, 40);
+      const labelOk = !rawLabel || /^[\p{L}\p{N}][\p{L}\p{N}\s.\-_/'"]{0,39}$/u.test(rawLabel);
+      const KIND = {
+        klettersitz: { area: "Klettersitz", prefix: "KS-" },
+        pirsch:      { area: "Pirsch",      prefix: "P-"  },
+      };
+      const cfg = KIND[String(free.kind || "klettersitz").toLowerCase()] || KIND.klettersitz;
+      const niceLabel = (labelOk && rawLabel) || (cfg.area + " " + lat.toFixed(4) + ", " + lng.toFixed(4));
+      postId = cfg.prefix + Date.now().toString(36).toUpperCase();
+      ensureSheet_(ss, SHEETS.posts, POST_HEADER).appendRow([postId, niceLabel, cfg.area, lat, lng]);
+      post = { id: postId, name: niceLabel, area: cfg.area, lat: lat, lng: lng };
+    }
+  }
+  if (!post && body.stand_nr) {
+    post = resolveStandToPost_(String(body.stand_nr));
+    if (post) postId = post.id;
+  }
+  const standNr = post ? String(post.name) : String(body.stand_nr || "").trim();
+
   const sheet = ensureSheet_(ss, SHEETS.nachsuchen, NACHSUCHE_HEADER);
   const id = "NS-" + Date.now().toString(36).toUpperCase();
   appendByName_(sheet, {
@@ -945,7 +977,7 @@ function nachsucheCreate_(body) {
     created_at: new Date().toISOString(),
     hunter: hunter,
     stand_nr: standNr,
-    post_id: postId,
+    post_id: post ? post.id : "",
     summary: summary,
     status: "open",
     closed_at: "",
@@ -963,7 +995,7 @@ function nachsucheCreate_(body) {
         subject: "Anschuss-Protokoll — Nachsuche" + (standNr ? " (Stand " + standNr + ")" : ""),
         body: "Hallo,\n\nanbei das Anschuss-Protokoll von " + hunter + "." +
           (summary ? "\n\n" + summary : "") +
-          "\n\n— automatisch versendet aus Pray (Peenwerder Jagd)",
+          "\n\n— automatisch versendet aus PREYE (Peenwerder Jagd)",
         attachments: [blob],
       });
       emailed = true;
@@ -971,7 +1003,7 @@ function nachsucheCreate_(body) {
       emailError = String(err && err.message || err);
     }
   }
-  return { ok: true, id: id, post_id: postId, post_found: !!post, emailed: emailed, email_error: emailError };
+  return { ok: true, id: id, post_id: post ? post.id : "", post_found: !!post, emailed: emailed, email_error: emailError };
 }
 
 function nachsucheClose_(body) {

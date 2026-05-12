@@ -182,7 +182,28 @@
       <div class="protocol-body" id="protocol-sheet">
         <div class="proto-banner">
           <span class="proto-banner-title">ANSCHUSS-PROTOKOLL</span>
-          <label class="proto-stand">Stand-Nr.<input type="text" data-proto="stand_nr" /></label>
+        </div>
+
+        <div class="proto-loc">
+          <div class="proto-mode-toggle" role="tablist" aria-label="Standort">
+            <button type="button" class="proto-mode-btn active" data-pmode="post">Kanzel</button>
+            <button type="button" class="proto-mode-btn" data-pmode="klettersitz">Klettersitz</button>
+            <button type="button" class="proto-mode-btn" data-pmode="pirsch">Pirsch</button>
+          </div>
+          <label class="proto-loc-row visible" data-pmode-show="post">
+            Stand / Kanzel
+            <select id="proto-post"></select>
+          </label>
+          <label class="proto-loc-row" data-pmode-show="coords">
+            Bezeichnung <span class="muted">(optional)</span>
+            <input type="text" id="proto-loc-label" maxlength="40" autocomplete="off"
+                   placeholder="z.B. Eichenwiese-Süd" />
+          </label>
+          <div class="proto-loc-row proto-loc-coords" data-pmode-show="coords">
+            <label>Breitengrad<input type="number" id="proto-loc-lat" step="0.000001" inputmode="decimal" /></label>
+            <label>Längengrad<input type="number" id="proto-loc-lng" step="0.000001" inputmode="decimal" /></label>
+          </div>
+          <button type="button" id="proto-loc-here" class="ghost" data-pmode-show="coords">Aktuelle Position</button>
         </div>
 
         <div class="proto-line">

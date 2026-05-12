@@ -887,6 +887,24 @@ function wireUi() {
   $("#proto-submit").addEventListener("click", submitProtocol);
   $("#proto-print").addEventListener("click", () => window.print());
   $("#proto-reset").addEventListener("click", resetProtocol);
+  document.querySelectorAll(".proto-mode-btn").forEach((b) => {
+    b.addEventListener("click", () => setProtoMode(b.dataset.pmode));
+  });
+  $("#proto-loc-here").addEventListener("click", () => {
+    if (!navigator.geolocation) {
+      showToast("Standort nicht verfügbar", "error");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        $("#proto-loc-lat").value = pos.coords.latitude.toFixed(6);
+        $("#proto-loc-lng").value = pos.coords.longitude.toFixed(6);
+        showToast("Position übernommen");
+      },
+      (err) => showToast("Standort: " + err.message, "error", 4000),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  });
   window.addEventListener("resize", () => {
     if (!$("#protocol-modal").hidden) protoFigures.forEach((f) => f.resize());
   });
@@ -1000,7 +1018,33 @@ function setupProtocolFigure(fig) {
   protoFigures.push({ resize, clear: () => { circles.length = 0; redraw(); } });
 }
 
+// Stand picker on the protocol — same Kanzel / Klettersitz / Pirsch toggle
+// as the harvest sheet. "post" = pick an existing Kanzel from the dropdown;
+// the other two reveal the coord inputs + "Aktuelle Position".
+let protoMode = "post";
+function setProtoMode(mode) {
+  protoMode = mode;
+  const displayGroup = mode === "post" ? "post" : "coords";
+  document.querySelectorAll(".proto-mode-btn").forEach((b) => {
+    const active = b.dataset.pmode === mode;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  document.querySelectorAll("[data-pmode-show]").forEach((el) => {
+    el.classList.toggle("visible", el.dataset.pmodeShow === displayGroup);
+  });
+}
+
 function openProtocol() {
+  const postSel = $("#proto-post");
+  postSel.innerHTML = "";
+  for (const p of state.posts) {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = `${p.name} (${p.area})`;
+    postSel.appendChild(opt);
+  }
+  setProtoMode("post");
   $("#protocol-backdrop").hidden = false;
   $("#protocol-modal").hidden = false;
   requestAnimationFrame(() => protoFigures.forEach((f) => f.resize()));
@@ -1015,6 +1059,7 @@ function resetProtocol() {
     else inp.value = "";
   });
   protoFigures.forEach((f) => f.clear());
+  setProtoMode("post");
 }
 
 function loadScriptOnce(src) {
@@ -1054,7 +1099,6 @@ async function submitProtocol() {
   const btn = $("#proto-submit");
   btn.disabled = true;
   try {
-    const standNr = protoField("stand_nr");
     const hunter = protoField("name") || protoField("nsf_name") || "?";
     const recipient = protoField("recipient");
     const parts = [];
@@ -1063,6 +1107,26 @@ async function submitProtocol() {
     if (protoField("s1_schuesse")) parts.push(protoField("s1_schuesse") + " Schuss");
     if (protoField("s1_beob")) parts.push(protoField("s1_beob"));
     const summary = parts.join(" · ").slice(0, 240);
+
+    // Location: a chosen Kanzel, or a free Klettersitz/Pirsch position.
+    const loc = {};
+    if (protoMode === "post") {
+      loc.post_id = $("#proto-post").value;
+      if (!loc.post_id) throw new Error("Bitte eine Kanzel wählen");
+    } else {
+      const latStr = $("#proto-loc-lat").value.trim();
+      const lngStr = $("#proto-loc-lng").value.trim();
+      const lat = Number(latStr);
+      const lng = Number(lngStr);
+      if (!latStr || !lngStr || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error("Bitte Koordinaten eingeben oder „Aktuelle Position“ nutzen");
+      }
+      loc.free_location = {
+        lat, lng,
+        label: $("#proto-loc-label").value.trim(),
+        kind: protoMode, // "klettersitz" | "pirsch"
+      };
+    }
 
     const wantEmail = recipient && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient);
     let pdf_base64 = "";
@@ -1078,10 +1142,10 @@ async function submitProtocol() {
         action: "nachsuche-create",
         token: localStorage.getItem("preye.token") || "",
         hunter,
-        stand_nr: standNr,
         summary,
         recipient,
         pdf_base64,
+        ...loc,
       }),
     });
     const data = await res.json();

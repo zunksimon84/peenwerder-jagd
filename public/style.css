@@ -947,8 +947,9 @@ body {
 .proto-banner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: #f5b800;
+  justify-content: center;
+  background: var(--green-bright);
+  border: 1px solid var(--green-bright-edge);
   border-radius: 6px;
   padding: 8px 12px;
   margin-bottom: 10px;
@@ -956,21 +957,64 @@ body {
 
 .proto-banner-title {
   font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #1a5e2a;
+  letter-spacing: 1px;
+  color: #111;
   font-size: 16px;
 }
 
-.proto-stand {
+/* Location picker — mirrors the harvest form's Kanzel/Klettersitz/Pirsch toggle */
+.proto-loc { margin-bottom: 10px; }
+
+.proto-mode-toggle {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #1a1a1a;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
 }
 
-.proto-stand input { width: 70px; }
+.proto-mode-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.proto-mode-btn.active { background: var(--green-bright); color: #111; }
+
+.proto-loc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.proto-loc-row.proto-loc-coords { flex-direction: row; gap: 10px; }
+.proto-loc-coords > label { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+
+[data-pmode-show]:not(.visible) { display: none !important; }
+
+.protocol-body select {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
 
 .proto-line {
   display: flex;
@@ -1024,14 +1068,14 @@ body {
 }
 
 .proto-table th {
-  background: #f5b800;
-  font-weight: 600;
+  background: var(--green-bright);
+  font-weight: 700;
   font-size: 10px;
-  color: #1a1a1a;
+  color: #111;
   line-height: 1.1;
 }
 
-.proto-table td:first-child { font-weight: 600; white-space: nowrap; background: #faf6ec; }
+.proto-table td:first-child { font-weight: 600; white-space: nowrap; background: var(--bg); }
 .proto-table td input { padding: 4px 3px; }
 
 .proto-label {
@@ -1079,12 +1123,12 @@ body {
 }
 
 .proto-pirsch-head {
-  background: #f5b800;
+  background: var(--green-bright);
   font-weight: 700;
   font-size: 12px;
   padding: 5px 8px;
   border-radius: 5px;
-  color: #1a5e2a;
+  color: #111;
   text-align: center;
   margin-bottom: 6px;
 }
@@ -1141,7 +1185,7 @@ body {
 }
 
 .proto-meldung label > span {
-  background: #d32f2f;
+  background: var(--steel-dark);
   color: #fff;
   font-weight: 700;
   font-size: 11px;
