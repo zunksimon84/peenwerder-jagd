@@ -1113,7 +1113,7 @@ body {
 /* The "Wildart / gesch. kg" cell holds two stacked controls. */
 .proto-cell-stack { padding: 3px; }
 .proto-cell-stack > * { display: block; width: 100%; }
-.proto-cell-stack > input { margin-bottom: 3px; }
+.proto-cell-stack > *:first-child { margin-bottom: 3px; }
 
 .proto-label {
   margin: 12px 0 4px;

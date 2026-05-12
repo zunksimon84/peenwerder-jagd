@@ -1108,6 +1108,62 @@ function loadScriptOnce(src) {
   });
 }
 
+// html2canvas mis-positions the text inside form controls (it sat low and
+// got clipped in the PDF). So in the cloned document we swap every input /
+// select / time field for a plain <div> carrying the same text — divs render
+// reliably. Border / padding / font are copied from the live element so the
+// layout doesn't shift. Checkboxes are left alone (they render fine).
+function flattenFormControlsForPdf(clonedDoc) {
+  const liveRoot = $("#protocol-sheet");
+  const clonedRoot = clonedDoc.getElementById("protocol-sheet");
+  if (!liveRoot || !clonedRoot) return;
+  const liveCtrls = liveRoot.querySelectorAll("input, select, textarea");
+  const clonedCtrls = clonedRoot.querySelectorAll("input, select, textarea");
+  liveCtrls.forEach((live, i) => {
+    const clone = clonedCtrls[i];
+    if (!clone) return;
+    if (live.tagName === "INPUT" && live.type === "checkbox") return; // renders ok
+    let text;
+    if (live.tagName === "SELECT") {
+      const opt = live.options[live.selectedIndex];
+      text = opt ? opt.textContent.trim() : "";
+      if (text === "—" || text === "–") text = ""; // the "—" placeholder
+    } else {
+      text = live.value || "";
+    }
+    const cs = getComputedStyle(live);
+    const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const borV = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    const fontPx = parseFloat(cs.fontSize) || 13;
+    const div = clonedDoc.createElement("div");
+    div.textContent = text;
+    div.style.boxSizing = "border-box";
+    div.style.width = "100%";
+    div.style.flex = "1 1 0%";
+    div.style.minWidth = "0";
+    // border-box min-height = one text line + the input's own padding + border,
+    // so empty fields don't collapse and filled ones match the live height.
+    div.style.minHeight = Math.round(fontPx * 1.4 + padV + borV) + "px";
+    div.style.padding = cs.paddingTop + " " + cs.paddingRight + " " + cs.paddingBottom + " " + cs.paddingLeft;
+    div.style.borderWidth = cs.borderTopWidth;
+    div.style.borderStyle = (parseFloat(cs.borderTopWidth) || 0) === 0 ? "none" : "solid";
+    div.style.borderColor = cs.borderTopColor;
+    div.style.borderRadius = cs.borderTopLeftRadius;
+    const bg = cs.backgroundColor;
+    div.style.background = (bg === "rgba(0, 0, 0, 0)" || bg === "transparent" || !bg) ? "#fff" : bg;
+    div.style.fontFamily = cs.fontFamily;
+    div.style.fontSize = cs.fontSize;
+    div.style.fontWeight = cs.fontWeight;
+    div.style.lineHeight = "1.4";
+    div.style.color = cs.color || "#1f1f1f";
+    div.style.textAlign = (cs.textAlign === "start" || cs.textAlign === "") ? "left" : cs.textAlign;
+    div.style.whiteSpace = "nowrap";
+    div.style.overflow = "hidden";
+    div.style.textOverflow = "ellipsis";
+    clone.replaceWith(div);
+  });
+}
+
 // Snapshot the filled-in protocol sheet to a multi-page A4 PDF (same layout
 // as printing) and return just the base64 payload (no data: prefix).
 // Libraries are lazy-loaded. The `.exporting` class temporarily un-clips the
@@ -1128,6 +1184,7 @@ async function generateProtocolPdf() {
       backgroundColor: "#ffffff",
       useCORS: true,
       windowWidth: 800,
+      onclone: flattenFormControlsForPdf,
     });
   } finally {
     modal.classList.remove("exporting");
