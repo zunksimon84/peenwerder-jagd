@@ -994,7 +994,7 @@ function setupProtocolFigure(fig) {
   }
   function redraw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const radius = Math.max(3.5 * dpr, canvas.width * 0.009);
+    const radius = Math.max(2 * dpr, canvas.width * 0.005);
     for (const c of circles) {
       const x = c.xr * canvas.width;
       const y = c.yr * canvas.height;
@@ -1002,7 +1002,7 @@ function setupProtocolFigure(fig) {
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fillStyle = "#e00000";
       ctx.fill();
-      ctx.lineWidth = Math.max(1 * dpr, radius * 0.35);
+      ctx.lineWidth = Math.max(0.75 * dpr, radius * 0.3);
       ctx.strokeStyle = "rgba(255,255,255,0.92)";
       ctx.stroke();
     }
