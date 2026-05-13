@@ -1764,6 +1764,30 @@ body.rsvp-page #rsvp-topbar {
   gap: 6px 12px;
   margin-top: 6px;
 }
+.ev-checkbox-grid--single { grid-template-columns: 1fr; }
+
+/* Two reviere side-by-side, each with its own column of checkboxes. */
+.ev-revier-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 6px;
+}
+.ev-revier-col { display: flex; flex-direction: column; gap: 6px; }
+.ev-revier-title {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--steel-dark);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+@media (max-width: 480px) {
+  .ev-revier-grid { grid-template-columns: 1fr; gap: 10px; }
+}
 .ev-checkbox {
   display: flex;
   align-items: center;

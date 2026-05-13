@@ -55,12 +55,25 @@
           <label>Name<input type="text" id="ev-name" required placeholder="z.B. Frühjahrs-Drückjagd 2026" /></label>
           <label>Datum<input type="date" id="ev-date" required /></label>
           <fieldset class="ev-fieldset">
-            <legend>Teilgebiet(e) <span class="muted">(mehrfach wählbar)</span></legend>
-            <div class="ev-checkbox-grid">
-              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Hauptrevier" /> Hauptrevier</label>
-              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Ost" /> Ost</label>
-              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Nord" /> Nord</label>
-              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Nordrand" /> Nordrand</label>
+            <legend>Teilgebiet(e) <span class="muted">(mehrfach wählbar, auch revierübergreifend)</span></legend>
+            <div class="ev-revier-grid">
+              <div class="ev-revier-col">
+                <p class="ev-revier-title">Peenwerder</p>
+                <div class="ev-checkbox-grid ev-checkbox-grid--single">
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Hauptrevier" /> Hauptrevier</label>
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Ost" /> Ost</label>
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Nord" /> Nord</label>
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Nordrand" /> Nordrand</label>
+                </div>
+              </div>
+              <div class="ev-revier-col">
+                <p class="ev-revier-title">NPA-Müritz</p>
+                <div class="ev-checkbox-grid ev-checkbox-grid--single">
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Babke" /> Babke</label>
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Langenhagen" /> Langenhagen</label>
+                  <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Schwarzenhof" /> Schwarzenhof</label>
+                </div>
+              </div>
             </div>
           </fieldset>
           <label>Anmeldeschluss <span class="muted">(leer = automatisch 2 Wochen vor dem Termin)</span><input type="date" id="ev-rsvp-deadline" /></label>

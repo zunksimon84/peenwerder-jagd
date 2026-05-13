@@ -1735,7 +1735,9 @@ function inviteEmailBodyTemplate_(ev) {
   const teilgebiet = String(ev.teilgebiet || "").trim();
   const organizer = String(ev.organizer || "").trim() || "Jakob";
 
-  const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in Peenwerder am **" +
+  const revier = revierFromTeilgebiete_(teilgebiet);
+  const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in **" +
+    revier + "** am **" +
     (eventDate || "[noch offen]") + "** einladen." +
     (teilgebiet ? " " + teilgebietSentence_(teilgebiet) : "");
 
@@ -1801,7 +1803,9 @@ function inviteEmailBodyTemplateEn_(ev) {
   const teilgebiet = String(ev.teilgebiet || "").trim();
   const organizer = String(ev.organizer || "").trim() || "Jakob";
 
-  const sentence1 = "I would like to cordially invite you to the next driven hunt (Drückjagd) in Peenwerder on **" +
+  const revier = revierFromTeilgebiete_(teilgebiet);
+  const sentence1 = "I would like to cordially invite you to the next driven hunt (Drückjagd) in **" +
+    revier + "** on **" +
     (eventDate || "[to be confirmed]") + "**." +
     (teilgebiet ? " " + teilgebietSentenceEn_(teilgebiet) : "");
 
@@ -1897,6 +1901,33 @@ function normalizeEventDates_(ev) {
     coordinator_phone: ev.coordinator_phone,
     nachsuchenfuehrer: ev.nachsuchenfuehrer,
   };
+}
+
+// Each Teilgebiet belongs to one Revier; the invitation needs to mention
+// which Revier the hunt is on (e.g. "Drückjagd in Peenwerder" vs
+// "Drückjagd in NPA-Müritz"). Anything unknown falls back to Peenwerder
+// for backward-compat with existing event rows.
+const REVIER_FOR_AREA = {
+  "Hauptrevier": "Peenwerder",
+  "Ost": "Peenwerder",
+  "Nord": "Peenwerder",
+  "Nordrand": "Peenwerder",
+  "Babke": "NPA-Müritz",
+  "Langenhagen": "NPA-Müritz",
+  "Schwarzenhof": "NPA-Müritz",
+};
+
+function revierFromTeilgebiete_(raw) {
+  const parts = String(raw || "").split(/\s*,\s*/).filter(function (p) { return p; });
+  const reviere = [];
+  for (let i = 0; i < parts.length; i++) {
+    const r = REVIER_FOR_AREA[parts[i]] || "Peenwerder";
+    if (reviere.indexOf(r) === -1) reviere.push(r);
+  }
+  if (reviere.length === 0) return "Peenwerder";
+  if (reviere.length === 1) return reviere[0];
+  // "Peenwerder und NPA-Müritz"
+  return reviere.slice(0, -1).join(", ") + " und " + reviere[reviere.length - 1];
 }
 
 // "Hauptrevier" → "Wir bejagen das Teilgebiet **Hauptrevier**."
