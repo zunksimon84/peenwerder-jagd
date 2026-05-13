@@ -968,7 +968,7 @@ function renderSquads() {
   // Helpful note if no Kanzeln are available (NPA-Müritz or no Teilgebiet picked).
   const kanzeln = getKanzelnForEvent();
   if (state.posts.length && !kanzeln.length) {
-    hint.textContent = "Keine Kanzeln im gewählten Teilgebiet hinterlegt — bitte „Klettersitz" mit Koordinaten verwenden.";
+    hint.textContent = 'Keine Kanzeln im gewählten Teilgebiet hinterlegt — bitte „Klettersitz" mit Koordinaten verwenden.';
   } else {
     hint.textContent = "";
   }
