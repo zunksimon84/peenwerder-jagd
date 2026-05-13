@@ -32,7 +32,7 @@ const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
 const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer"];
-const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "role", "dogs", "invited_at", "responded_at"];
+const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "language", "token", "status", "role", "dogs", "invited_at", "responded_at"];
 
 // JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
 // the backend can validate what the RSVP page submits. "Sonstige" lets a
@@ -63,7 +63,7 @@ const DOG_BREEDS = [
   "Sonstige",
 ];
 const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members"];
-const ADDRESS_BOOK_HEADER = ["name", "email"];
+const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
 
 // ---------- HTTP entrypoints ----------
 
@@ -123,6 +123,10 @@ function doPost(e) {
     }
     if (action === "event-hunter-add") {
       const r = eventHunterAdd_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-hunters-batch-add") {
+      const r = eventHuntersBatchAdd_(body);
       return json_(r, r.error ? 400 : 200);
     }
     if (action === "event-hunter-remove") {
@@ -1451,10 +1455,13 @@ function eventDetail_(params) {
     .map(function (h) {
       let dogs = [];
       try { dogs = JSON.parse(String(h.dogs || "[]")); } catch (e) {}
+      let lang = String(h.language || "").trim().toLowerCase();
+      if (lang !== "de" && lang !== "en") lang = "de";
       return {
         id: String(h.id),
         hunter: String(h.hunter || ""),
         email: String(h.email || ""),
+        language: lang,
         status: String(h.status || "pending"),
         role: String(h.role || ""),
         dogs: Array.isArray(dogs) ? dogs : [],
@@ -1549,9 +1556,12 @@ function eventHunterAdd_(body) {
   const eventId = String(body.event_id || "").trim();
   const hunter = String(body.hunter || "").trim();
   const email = String(body.email || "").trim();
+  let language = String(body.language || "").trim().toLowerCase();
+  if (language !== "de" && language !== "en") language = "de";
   if (!eventId) return { error: "event_id required" };
   if (!hunter) return { error: "hunter required" };
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid email" };
+  if (!email) return { error: "E-Mail erforderlich" };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "Ungültige E-Mail-Adresse" };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
   // Reject duplicate (same event, same hunter name).
@@ -1560,21 +1570,50 @@ function eventHunterAdd_(body) {
       return String(h.event_id) === eventId &&
              String(h.hunter).toLowerCase() === hunter.toLowerCase();
     });
-  if (existing) return { error: "already on the roster" };
+  if (existing) return { error: hunter + " ist bereits auf der Liste" };
   const id = "EH-" + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1000);
   appendByName_(sheet, {
     id: id,
     event_id: eventId,
     hunter: hunter,
     email: email,
+    language: language,
     token: randomToken_(),
     status: "pending",
     invited_at: "",
     responded_at: "",
   });
-  // Upsert into the address book so future events autocomplete it.
-  if (email) addressBookUpsert_(hunter, email);
+  // Upsert into the address book so future events can pick it from a list.
+  addressBookUpsert_(hunter, email, language);
   return { ok: true, id: id };
+}
+
+// Batch-add several hunters (from a CSV import or address-book selection)
+// in one call. Returns counts + per-row errors so the UI can summarise.
+function eventHuntersBatchAdd_(body) {
+  const eventId = String(body.event_id || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  const rows = Array.isArray(body.hunters) ? body.hunters : [];
+  let added = 0;
+  const errors = [];
+  const skipped = [];
+  for (let i = 0; i < rows.length && i < 200; i++) {
+    const r = rows[i] || {};
+    const result = eventHunterAdd_({
+      event_id: eventId,
+      hunter: r.name || r.hunter || "",
+      email: r.email || "",
+      language: r.language || "de",
+    });
+    if (result.error) {
+      // Duplicates are a quiet skip rather than a loud error.
+      if (/bereits auf der Liste/.test(result.error)) skipped.push(r.name || r.email || "");
+      else errors.push({ name: r.name || r.email || "(unbekannt)", error: result.error });
+    } else {
+      added++;
+    }
+  }
+  return { ok: true, added: added, skipped: skipped, errors: errors };
 }
 
 function eventHunterRemove_(body) {
@@ -1608,13 +1647,19 @@ function eventInvitesSend_(body) {
   const baseUrl = String(body.base_url || "").trim();
   if (!baseUrl) return { error: "base_url required (the site origin so the magic-link works)" };
 
-  // Optional overrides from the preview-and-edit modal. body_text must
-  // contain the literal token {link} where the magic URL gets substituted;
+  // Per-language overrides from the preview-and-edit modal. Each must
+  // contain the literal token {link} where the magic URL is substituted;
   // we append it automatically if the organizer accidentally stripped it.
-  let bodyTemplate = String(body.body_text || "").trim();
-  if (!bodyTemplate) bodyTemplate = inviteEmailBodyTemplate_(ev);
-  if (bodyTemplate.indexOf("{link}") < 0) bodyTemplate += "\n\n{link}";
-  const subject = String(body.subject || "").trim() || inviteSubject_(ev);
+  function prepBody(raw, fallback) {
+    let t = String(raw || "").trim();
+    if (!t) t = fallback;
+    if (t.indexOf("{link}") < 0) t += "\n\n{link}";
+    return t;
+  }
+  const subjectDe = String(body.subject_de || body.subject || "").trim() || inviteSubject_(ev);
+  const subjectEn = String(body.subject_en || "").trim() || inviteSubjectEn_(ev);
+  const bodyTemplateDe = prepBody(body.body_text_de || body.body_text || "", inviteEmailBodyTemplate_(ev));
+  const bodyTemplateEn = prepBody(body.body_text_en || "", inviteEmailBodyTemplateEn_(ev));
 
   const rows = huntersSheet.getRange(2, 1, Math.max(huntersSheet.getLastRow() - 1, 0), EVENT_HUNTER_HEADER.length).getValues();
   const headers = huntersSheet.getRange(1, 1, 1, EVENT_HUNTER_HEADER.length).getValues()[0]
@@ -1624,6 +1669,7 @@ function eventInvitesSend_(body) {
   const colHunter = headers.indexOf("hunter");
   const colToken = headers.indexOf("token");
   const colStatus = headers.indexOf("status");
+  const colLanguage = headers.indexOf("language");
   const colInvitedAt = headers.indexOf("invited_at");
 
   let sent = 0, skipped = 0;
@@ -1635,6 +1681,12 @@ function eventInvitesSend_(body) {
     const invitedAt = String(rows[i][colInvitedAt] || "").trim();
     if (onlyUnsent && invitedAt) { skipped++; continue; }
     const hunter = String(rows[i][colHunter] || "");
+    const hunterLang = colLanguage >= 0
+      ? String(rows[i][colLanguage] || "").trim().toLowerCase()
+      : "de";
+    const useEn = hunterLang === "en";
+    const subject = useEn ? subjectEn : subjectDe;
+    const bodyTemplate = useEn ? bodyTemplateEn : bodyTemplateDe;
     const token = String(rows[i][colToken] || "") || randomToken_();
     if (!String(rows[i][colToken] || "").trim()) {
       huntersSheet.getRange(i + 2, colToken + 1).setValue(token);
@@ -1737,21 +1789,89 @@ function inviteSubject_(ev) {
   return "Einladung Drückjagd: " + String(ev.name || "").trim();
 }
 
+// English variants for guests who picked language = "en". Wording mirrors
+// Jakob's German template; hunting-specific terms (Schütze / Treiber /
+// Hundeführer) are kept in German with the English meaning in parentheses
+// because that's how the rest of the day will run on the ground.
+function inviteEmailBodyTemplateEn_(ev) {
+  const eventDate = formatLongEnglishDate_(ev.date);
+  const twoWeeksBefore = addDays_(ev.date, -14);
+  const rsvpDeadline = formatLongEnglishDate_(ev.rsvp_deadline || twoWeeksBefore);
+  const writtenInvite = formatLongEnglishDate_(twoWeeksBefore);
+  const teilgebiet = String(ev.teilgebiet || "").trim();
+  const organizer = String(ev.organizer || "").trim() || "Jakob";
+
+  const sentence1 = "I would like to cordially invite you to the next driven hunt (Drückjagd) in Peenwerder on **" +
+    (eventDate || "[to be confirmed]") + "**." +
+    (teilgebiet ? " " + teilgebietSentenceEn_(teilgebiet) : "");
+
+  return [
+    "Dear friends of forestry,",
+    "",
+    sentence1,
+    "",
+    "Please confirm your participation by **" + (rsvpDeadline || "[to be confirmed]") +
+      "** and let me know in what capacity you would like to take part (Schütze / Treiber / Hundeführer — shooter / beater / dog handler). Please use only this link:",
+    "",
+    "{link}",
+    "",
+    "Beaters may be brought along, please register them by name beforehand.",
+    "",
+    "On or around **" + (writtenInvite || "[to be confirmed]") +
+      "** (two weeks before) I will send you a written invitation with the details of arrival and schedule.",
+    "",
+    "Looking forward to a good turnout, and may we hunt fairly and together with joy. Horrido!",
+    "",
+    "Yours, **" + organizer + "**",
+  ].join("\n");
+}
+
+function inviteSubjectEn_(ev) {
+  return "Invitation — driven hunt: " + String(ev.name || "").trim();
+}
+
+function teilgebietSentenceEn_(raw) {
+  const parts = String(raw || "").split(/\s*,\s*/).filter(function (p) { return p; });
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return "We will hunt the area **" + parts[0] + "**.";
+  const bold = parts.map(function (p) { return "**" + p + "**"; });
+  const last = bold[bold.length - 1];
+  const head = bold.slice(0, -1).join(", ");
+  return "We will hunt the areas " + head + " and " + last + ".";
+}
+
+function formatLongEnglishDate_(isoDate) {
+  const s = String(isoDate || "").trim();
+  if (!s) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (!m) return s;
+  const MONTHS = ["January", "February", "March", "April", "May", "June",
+                  "July", "August", "September", "October", "November", "December"];
+  const day = parseInt(m[3], 10);
+  const suffix = (day >= 11 && day <= 13) ? "th"
+              : (day % 10 === 1) ? "st"
+              : (day % 10 === 2) ? "nd"
+              : (day % 10 === 3) ? "rd" : "th";
+  return MONTHS[parseInt(m[2], 10) - 1] + " " + day + suffix + ", " + m[1];
+}
+
 // Public preview endpoint — frontend uses this to show the editable email
-// before sending so the organizer can amend wording.
+// before sending so the organizer can amend wording. The language param
+// switches between the German default and the English variant for guests.
 function invitePreview_(params) {
   const id = String((params && params.event_id) || "").trim();
   if (!id) return { error: "event_id required" };
+  const lang = String((params && params.language) || "de").toLowerCase();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
   const raw = readSheet_(SHEETS.events, EVENT_HEADER)
     .find(function (e) { return String(e.id) === id; });
   if (!raw) return { error: "event not found" };
   const ev = normalizeEventDates_(raw);
-  return {
-    subject: inviteSubject_(ev),
-    body: inviteEmailBodyTemplate_(ev),
-  };
+  if (lang === "en") {
+    return { subject: inviteSubjectEn_(ev), body: inviteEmailBodyTemplateEn_(ev) };
+  }
+  return { subject: inviteSubject_(ev), body: inviteEmailBodyTemplate_(ev) };
 }
 
 // Strip Google Sheets' Date typing on the four date/time columns so anything
@@ -1849,10 +1969,13 @@ function rsvpInfo_(params) {
   if (!ev) return { error: "event not found" };
   let dogs = [];
   try { dogs = JSON.parse(String(eh.dogs || "[]")); } catch (e) {}
+  let lang = String(eh.language || "").trim().toLowerCase();
+  if (lang !== "de" && lang !== "en") lang = "de";
   return {
     hunter: String(eh.hunter || ""),
     status: String(eh.status || ""),
     role: String(eh.role || ""),
+    language: lang,
     dogs: Array.isArray(dogs) ? dogs : [],
     breeds: DOG_BREEDS,
     event: {
@@ -2025,25 +2148,38 @@ function addressBookList_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
   return readSheet_(SHEETS.address_book, ADDRESS_BOOK_HEADER).map(function (r) {
-    return { name: String(r.name || ""), email: String(r.email || "") };
+    let lang = String(r.language || "").trim().toLowerCase();
+    if (lang !== "de" && lang !== "en") lang = "de";
+    return {
+      name: String(r.name || ""),
+      email: String(r.email || ""),
+      language: lang,
+    };
   });
 }
 
-function addressBookUpsert_(name, email) {
+function addressBookUpsert_(name, email, language) {
   if (!name || !email) return;
+  const lang = (language === "en") ? "en" : "de";
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const colName = headers.indexOf("name");
+  const colEmail = headers.indexOf("email");
+  const colLang = headers.indexOf("language");
   const lastRow = sheet.getLastRow();
   if (lastRow >= 2) {
     const rows = sheet.getRange(2, 1, lastRow - 1, ADDRESS_BOOK_HEADER.length).getValues();
     for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim().toLowerCase() === name.toLowerCase()) {
-        sheet.getRange(i + 2, 2).setValue(email);
+      if (String(rows[i][colName]).trim().toLowerCase() === name.toLowerCase()) {
+        sheet.getRange(i + 2, colEmail + 1).setValue(email);
+        if (colLang >= 0) sheet.getRange(i + 2, colLang + 1).setValue(lang);
         return;
       }
     }
   }
-  sheet.appendRow([name, email]);
+  appendByName_(sheet, { name: name, email: email, language: lang });
 }
 
 function randomToken_() {

@@ -107,10 +107,19 @@
           <button class="ev-tab" data-tab="squads">Squads</button>
         </nav>
         <div class="ev-tab-panel" id="tab-invites">
+          <div class="invites-toolbar">
+            <button type="button" id="open-address-book" class="ghost-btn">Aus Adressbuch wählen</button>
+            <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
+            <input type="file" id="csv-input" accept=".csv,text/csv,text/plain" hidden />
+          </div>
           <form id="add-hunter-form" class="add-hunter-form">
             <input type="text" id="add-hunter-name" list="address-book-options"
                    placeholder="Name" autocomplete="off" required />
-            <input type="email" id="add-hunter-email" placeholder="E-Mail (optional)" autocomplete="off" />
+            <input type="email" id="add-hunter-email" placeholder="E-Mail" autocomplete="off" required />
+            <select id="add-hunter-lang" class="lang-picker" aria-label="Sprache der Einladung">
+              <option value="de" selected>🇩🇪 DE</option>
+              <option value="en">🇬🇧 EN</option>
+            </select>
             <button type="submit" class="primary-btn small">+ Hinzufügen</button>
           </form>
           <datalist id="address-book-options"></datalist>
@@ -126,6 +135,27 @@
       </section>
     </main>
 
+    <div id="address-book-backdrop" hidden></div>
+    <section id="address-book-modal" hidden aria-modal="true" role="dialog" aria-labelledby="address-book-title">
+      <header>
+        <h2 id="address-book-title">Adressbuch</h2>
+        <button id="address-book-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="address-book-body">
+        <p class="invite-hint">
+          Häkchen setzen, um einen Jäger zur Veranstaltung einzuladen — Häkchen
+          entfernen, um ihn von dieser Veranstaltung zu entfernen. Das Adressbuch
+          selbst bleibt unverändert.
+        </p>
+        <div id="address-book-list" class="address-book-list"></div>
+        <p id="address-book-empty" class="empty-msg" hidden>Noch keine Kontakte im Adressbuch.</p>
+      </div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="address-book-apply" type="button" class="primary-btn">Übernehmen</button>
+        <button id="address-book-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
+
     <div id="invite-backdrop" hidden></div>
     <section id="invite-modal" hidden aria-modal="true" role="dialog" aria-labelledby="invite-modal-title">
       <header>
@@ -133,10 +163,15 @@
         <button id="invite-close" type="button" aria-label="Schließen">×</button>
       </header>
       <div class="invite-modal-body">
+        <div class="invite-lang-tabs" role="tablist" aria-label="Sprache der Einladung">
+          <button type="button" class="invite-lang-tab active" data-lang="de" role="tab">🇩🇪 Deutsch</button>
+          <button type="button" class="invite-lang-tab" data-lang="en" role="tab">🇬🇧 English</button>
+        </div>
         <p class="invite-hint">
           Prüfe und ändere den Text. <code>**Text**</code> erscheint im E-Mail
           <b>fett</b>; <code>{link}</code> wird für jeden Jäger durch seinen
-          persönlichen Anmeldelink ersetzt.
+          persönlichen Anmeldelink ersetzt. Jäger erhalten die Einladung in der
+          oben gewählten Sprache automatisch.
         </p>
         <label class="invite-field">
           Betreff
