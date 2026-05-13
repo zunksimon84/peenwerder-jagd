@@ -2081,6 +2081,19 @@ body.rsvp-page #rsvp-topbar {
   border-bottom-color: var(--green-bright);
 }
 
+.ev-section {
+  margin-top: 22px;
+}
+.ev-section-title {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.ev-section--squads .ev-section-title { border-bottom-color: var(--green-bright); }
+
 .ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
 
 /* Ansteller Runden ---------------------------------------------------------- */
@@ -2094,7 +2107,125 @@ body.rsvp-page #rsvp-topbar {
 }
 .squads-toolbar .muted { font-size: 12px; }
 
-#squads-list { display: flex; flex-direction: column; gap: 14px; }
+/* 3-up grid of compact tiles — like a parade roster of the Runden. */
+.squads-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+@media (max-width: 720px) { .squads-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .squads-grid { grid-template-columns: 1fr; } }
+
+.squad-tile {
+  background: var(--green-bright);
+  border: 1px solid var(--green-bright-edge);
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 92px;
+  transition: transform 0.08s, box-shadow 0.12s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.squad-tile:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+.squad-tile:active { transform: scale(0.98); }
+.squad-tile-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.squad-tile-ansteller { font-size: 13px; }
+.squad-tile-count { font-size: 12px; color: #2d3a05; opacity: 0.8; margin-top: auto; }
+.squad-tile-ansteller .muted { color: #4a4d52; }
+
+/* Squad edit modal --------------------------------------------------------- */
+
+#squad-edit-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 50;
+}
+#squad-edit-modal {
+  position: fixed;
+  z-index: 51;
+  left: 8px;
+  right: 8px;
+  top: calc(8px + var(--safe-top) + var(--vv-top));
+  bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--green-bright);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+#squad-edit-modal[hidden] { display: none; }
+#squad-edit-modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+#squad-edit-modal > header h2 { margin: 0; font-size: 17px; }
+#squad-edit-close {
+  background: transparent;
+  border: none;
+  font-size: 26px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.squad-edit-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+.squad-modal-hint {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-left: 3px solid var(--green-bright);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--steel-dark);
+}
+
+.modal-danger-row { margin-top: 16px; }
+.ghost-btn--danger {
+  color: #c0392b;
+  border-color: #f1c1bb;
+}
+.ghost-btn--danger:hover {
+  background: #fbe9e7;
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+.schuetze-row--ansteller {
+  border-color: var(--green-bright-edge);
+  background: #f3f8df; /* very light lime */
+}
+.schuetze-row--ansteller .sr-num {
+  color: var(--green-bright-edge);
+  font-weight: 700;
+  flex: 0 0 auto;
+  padding-right: 6px;
+  letter-spacing: 0.3px;
+}
+.sr-remove-placeholder { display: inline-block; width: 28px; height: 28px; }
 
 .squad-card {
   background: var(--card);

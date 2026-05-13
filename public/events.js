@@ -408,7 +408,9 @@ function renderEventDetail() {
   `;
   renderContactsBlock(event);
   renderHuntersList(hunters);
-  if (state.postsLoaded) renderSquads();
+  // Squads section is always visible now (no tabs), so load the posts data
+  // it needs on every event open.
+  loadPostsIfNeeded().then(renderSquads);
 }
 
 function formatLongDate(iso) {
@@ -890,17 +892,6 @@ function onHunterNamePick() {
   if (hit.language) $("#add-hunter-lang").value = hit.language;
 }
 
-// ---------- Tabs ----------
-
-function switchTab(tab) {
-  $$(".ev-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  $("#tab-invites").hidden = tab !== "invites";
-  $("#tab-squads").hidden = tab !== "squads";
-  if (tab === "squads") {
-    loadPostsIfNeeded().then(renderSquads);
-  }
-}
-
 // ---------- Ansteller Runden (squads) ----------
 // Each Ansteller Runde = one Ansteller (group leader) + several Schützen,
 // each assigned to a Kanzel (from the event's Teilgebiet) or to a
@@ -974,6 +965,16 @@ function nextAnstellerRundeName() {
   return "Ansteller Runde " + toRoman(max + 1);
 }
 
+// Convert legacy "Ansteller Runde 1" to Roman ("Ansteller Runde I") at
+// display time so older test squads pick up the new style without a backend
+// migration.
+function displayRundeName(name) {
+  const s = String(name || "").trim();
+  const m = /^(Ansteller Runde)\s+(\d+)\s*$/i.exec(s);
+  if (m) return m[1] + " " + toRoman(parseInt(m[2], 10));
+  return s || "Ansteller Runde";
+}
+
 function renderSquads() {
   const wrap = $("#squads-list");
   const empty = $("#squads-empty");
@@ -984,10 +985,12 @@ function renderSquads() {
     empty.hidden = false;
   } else {
     empty.hidden = true;
-    wrap.innerHTML = squads.map((s) => renderSquadCard(s)).join("");
-    squads.forEach((s) => wireSquadCard(document.getElementById("squad-" + s.id), s));
+    wrap.innerHTML = squads.map(renderSquadTile).join("");
+    wrap.querySelectorAll(".squad-tile").forEach((tile) => {
+      tile.addEventListener("click", () => openSquadEditor(tile.dataset.sid));
+    });
   }
-  // Helpful note if no Kanzeln are available (NPA-Müritz or no Teilgebiet picked).
+  // Note if no Kanzeln are available (NPA-Müritz or no Teilgebiet picked).
   const kanzeln = getKanzelnForEvent();
   if (state.posts.length && !kanzeln.length) {
     hint.textContent = 'Keine Kanzeln im gewählten Teilgebiet hinterlegt — bitte „Klettersitz" mit Koordinaten verwenden.';
@@ -996,43 +999,117 @@ function renderSquads() {
   }
 }
 
-function renderSquadCard(squad) {
-  const accepted = getAcceptedHunters();
-  const anstellerOptions = anstellerSelectHtml(accepted, squad.ansteller);
-  const positionsHtml = (squad.positions || []).map((p, i) =>
-    renderSchuetzeRow(p, i, accepted)
-  ).join("");
+// Compact tile in the grid. Click → openSquadEditor.
+function renderSquadTile(squad) {
+  // The Ansteller is the first Schütze; falls back to the stored ansteller
+  // field for squads created before the merge.
+  const ansteller = (squad.positions && squad.positions[0] && squad.positions[0].hunter)
+    || squad.ansteller || "";
+  const schuetzenCount = (squad.positions || []).filter((p) => p && p.hunter).length;
+  const others = Math.max(schuetzenCount - 1, 0);
+  const summary = ansteller
+    ? `Ansteller: ${escapeHtml(ansteller)}`
+    : '<span class="muted">Ansteller noch offen</span>';
   return `
-    <article class="squad-card" id="squad-${escapeHtml(squad.id)}" data-sid="${escapeHtml(squad.id)}">
-      <header class="squad-head">
-        <h3 class="squad-name">${escapeHtml(squad.name || "Ansteller Runde")}</h3>
-        <button class="link-btn squad-delete" type="button" aria-label="Runde löschen" title="Runde löschen">×</button>
-      </header>
-      <label class="squad-field">
-        <span class="squad-field-label">Ansteller</span>
-        <select class="squad-ansteller">${anstellerOptions}</select>
-      </label>
-      <p class="squad-field-label squad-schuetzen-title">Schützen</p>
-      <div class="schuetzen-list">${positionsHtml}</div>
-      <button class="ghost-btn squad-add-schuetze" type="button">+ Schütze hinzufügen</button>
-      <label class="squad-field">
-        <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
-        <textarea class="squad-briefing" rows="2">${escapeHtml(squad.briefing || "")}</textarea>
-      </label>
-      <div class="squad-actions">
-        <button class="primary-btn small squad-save" type="button">Speichern</button>
-        <span class="squad-status muted"></span>
-      </div>
-    </article>
+    <button type="button" class="squad-tile" data-sid="${escapeHtml(squad.id)}">
+      <span class="squad-tile-name">${escapeHtml(displayRundeName(squad.name))}</span>
+      <span class="squad-tile-ansteller">${summary}</span>
+      <span class="squad-tile-count">${schuetzenCount} Schütze${schuetzenCount === 1 ? "" : "n"}${others ? ` (+${others} weitere)` : ""}</span>
+    </button>
   `;
 }
 
-function anstellerSelectHtml(accepted, currentValue) {
-  const opts = accepted.map((h) => {
-    const sel = (h.hunter === currentValue) ? " selected" : "";
-    return `<option value="${escapeHtml(h.hunter)}"${sel}>${escapeHtml(h.hunter)}</option>`;
-  }).join("");
-  return `<option value="">— Ansteller wählen —</option>${opts}`;
+let editingSquadId = null;
+
+function openSquadEditor(sid) {
+  const squad = (state.currentEvent?.squads || []).find((s) => s.id === sid);
+  if (!squad) return;
+  editingSquadId = sid;
+  $("#squad-edit-title").textContent = displayRundeName(squad.name);
+  const body = $("#squad-edit-body");
+  const accepted = getAcceptedHunters();
+  // Always show at least one Schütze row so the Ansteller is visible.
+  const positions = (squad.positions && squad.positions.length) ? squad.positions : [{ hunter: "" }];
+  body.innerHTML = `
+    <p class="squad-modal-hint">
+      Reihe 1 ist <strong>der Ansteller</strong> — er bekommt seinen Stand wie jeder andere Schütze.
+    </p>
+    <div class="schuetzen-list" id="modal-schuetzen-list">
+      ${positions.map((p, i) => renderSchuetzeRow(p, i, accepted)).join("")}
+    </div>
+    <button class="ghost-btn" type="button" id="modal-add-schuetze">+ Schütze hinzufügen</button>
+    <label class="squad-field">
+      <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
+      <textarea id="modal-squad-briefing" rows="2">${escapeHtml(squad.briefing || "")}</textarea>
+    </label>
+    <div class="modal-danger-row">
+      <button id="modal-squad-delete" class="ghost-btn ghost-btn--danger" type="button">Runde löschen</button>
+    </div>
+  `;
+  body.querySelectorAll(".schuetze-row").forEach(wireSchuetzeRow);
+  $("#modal-add-schuetze").addEventListener("click", () => {
+    const list = $("#modal-schuetzen-list");
+    const idx = list.querySelectorAll(".schuetze-row").length;
+    list.insertAdjacentHTML("beforeend", renderSchuetzeRow(null, idx, accepted));
+    wireSchuetzeRow(list.lastElementChild);
+  });
+  $("#modal-squad-delete").addEventListener("click", () => deleteEditingSquad(squad));
+  $("#squad-edit-backdrop").hidden = false;
+  $("#squad-edit-modal").hidden = false;
+}
+
+function closeSquadEditor() {
+  editingSquadId = null;
+  $("#squad-edit-modal").hidden = true;
+  $("#squad-edit-backdrop").hidden = true;
+}
+
+async function saveEditingSquad() {
+  if (!editingSquadId || !state.currentEvent) return;
+  const squad = state.currentEvent.squads.find((s) => s.id === editingSquadId);
+  if (!squad) return;
+  const btn = $("#squad-edit-save");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Speichere …";
+  try {
+    const positions = collectPositions($("#squad-edit-body"));
+    // The Ansteller is whoever sits at the top of the Schützen list.
+    const ansteller = positions[0]?.hunter || "";
+    const briefing = $("#modal-squad-briefing").value.trim();
+    await postJson({
+      action: "event-squad-save",
+      id: squad.id,
+      event_id: state.currentEvent.event.id,
+      name: squad.name,
+      ansteller,
+      positions,
+      briefing,
+    });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    // Update local state and re-render tiles.
+    Object.assign(squad, { ansteller, positions, briefing });
+    renderSquads();
+    closeSquadEditor();
+    showToast("Gespeichert ✓");
+  } catch (err) {
+    showToast(err.message || "Fehler beim Speichern", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+async function deleteEditingSquad(squad) {
+  if (!confirm(`„${displayRundeName(squad.name)}" wirklich löschen?`)) return;
+  try {
+    await postJson({ action: "event-squad-delete", id: squad.id });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    closeSquadEditor();
+    await loadEventDetail(state.currentEvent.event.id);
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  }
 }
 
 function hunterSelectHtml(accepted, currentValue) {
@@ -1066,12 +1143,18 @@ function renderSchuetzeRow(pos, idx, accepted) {
   const isKlettersitz = pos && pos.type === "klettersitz";
   const lat = pos && pos.lat !== undefined && pos.lat !== "" ? Number(pos.lat).toFixed(6) : "";
   const lng = pos && pos.lng !== undefined && pos.lng !== "" ? Number(pos.lng).toFixed(6) : "";
+  const isAnsteller = idx === 0;
+  // Row 1 is the Ansteller; the rest are regular Schützen, numbered from 2.
+  const numLabel = isAnsteller ? "Ansteller" : (idx + 1) + ".";
+  const removeBtn = isAnsteller
+    ? '<span class="sr-remove sr-remove-placeholder" aria-hidden="true"></span>'
+    : '<button class="link-btn sr-remove" type="button" aria-label="Schützen entfernen">×</button>';
   return `
-    <div class="schuetze-row" data-idx="${idx}">
+    <div class="schuetze-row${isAnsteller ? " schuetze-row--ansteller" : ""}" data-idx="${idx}">
       <div class="sr-line sr-hunter-line">
-        <span class="sr-num">${idx + 1}.</span>
+        <span class="sr-num">${escapeHtml(numLabel)}</span>
         <select class="sr-hunter">${hunterSelectHtml(accepted, pos && pos.hunter)}</select>
-        <button class="link-btn sr-remove" type="button" aria-label="Schützen entfernen">×</button>
+        ${removeBtn}
       </div>
       <div class="sr-line sr-position-line">
         <select class="sr-position">${positionSelectHtml(pos)}</select>
@@ -1090,38 +1173,11 @@ function renderSchuetzeRow(pos, idx, accepted) {
   `;
 }
 
-function wireSquadCard(card, squad) {
-  if (!card) return;
-  // Delete the whole Runde.
-  card.querySelector(".squad-delete").addEventListener("click", async () => {
-    if (!confirm(`„${squad.name}" wirklich löschen?`)) return;
-    try {
-      await postJson({ action: "event-squad-delete", id: squad.id });
-      invalidateCache("event-detail", { id: state.currentEvent.event.id });
-      await loadEventDetail(state.currentEvent.event.id);
-    } catch (err) {
-      showToast(err.message || "Fehler", "error");
-    }
-  });
-  // Add a new Schütze row.
-  card.querySelector(".squad-add-schuetze").addEventListener("click", () => {
-    const list = card.querySelector(".schuetzen-list");
-    const idx = list.querySelectorAll(".schuetze-row").length;
-    const accepted = getAcceptedHunters();
-    list.insertAdjacentHTML("beforeend", renderSchuetzeRow(null, idx, accepted));
-    wireSchuetzeRow(list.lastElementChild);
-  });
-  // Wire existing rows.
-  card.querySelectorAll(".schuetze-row").forEach(wireSchuetzeRow);
-  // Save.
-  card.querySelector(".squad-save").addEventListener("click", () => saveSquadCard(card, squad));
-}
-
 function wireSchuetzeRow(row) {
   if (!row) return;
-  row.querySelector(".sr-remove").addEventListener("click", () => {
-    row.remove();
-  });
+  // Ansteller row has no removable button (it's a placeholder span).
+  const removeBtn = row.querySelector("button.sr-remove");
+  if (removeBtn) removeBtn.addEventListener("click", () => row.remove());
   const posSel = row.querySelector(".sr-position");
   const coords = row.querySelector(".sr-coords");
   posSel.addEventListener("change", () => {
@@ -1176,42 +1232,6 @@ function collectPositions(card) {
   return positions;
 }
 
-async function saveSquadCard(card, squad) {
-  const btn = card.querySelector(".squad-save");
-  const status = card.querySelector(".squad-status");
-  btn.disabled = true;
-  const oldText = btn.textContent;
-  btn.textContent = "Speichere …";
-  status.textContent = "";
-  try {
-    const positions = collectPositions(card);
-    const ansteller = card.querySelector(".squad-ansteller").value.trim();
-    const briefing = card.querySelector(".squad-briefing").value.trim();
-    await postJson({
-      action: "event-squad-save",
-      id: squad.id,
-      event_id: state.currentEvent.event.id,
-      name: squad.name,
-      ansteller,
-      positions,
-      briefing,
-    });
-    invalidateCache("event-detail", { id: state.currentEvent.event.id });
-    status.textContent = "Gespeichert ✓";
-    setTimeout(() => { status.textContent = ""; }, 2500);
-    // Update local state without re-rendering the whole list (preserves
-    // user's place in the form if they edit multiple cards).
-    const squads = state.currentEvent.squads;
-    const idx = squads.findIndex((x) => x.id === squad.id);
-    if (idx >= 0) squads[idx] = { ...squad, ansteller, positions, briefing };
-  } catch (err) {
-    showToast(err.message || "Fehler beim Speichern", "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = oldText;
-  }
-}
-
 async function addSquad() {
   if (!state.currentEvent) return;
   const btn = $("#new-squad-btn");
@@ -1236,10 +1256,9 @@ async function addSquad() {
     });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
     await loadEventDetail(state.currentEvent.event.id);
-    requestAnimationFrame(() => {
-      const card = document.getElementById("squad-" + r.id);
-      if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
+    // Open the editor for the just-created Runde so the user can pick the
+    // Ansteller and positions right away.
+    openSquadEditor(r.id);
   } catch (err) {
     showToast(err.message || "Fehler", "error");
   } finally {
@@ -1306,7 +1325,10 @@ function wireUi() {
       deleteEvent(btn.dataset.eid);
     }
   });
-  $$(".ev-tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+  $("#squad-edit-close").addEventListener("click", closeSquadEditor);
+  $("#squad-edit-cancel").addEventListener("click", closeSquadEditor);
+  $("#squad-edit-backdrop").addEventListener("click", closeSquadEditor);
+  $("#squad-edit-save").addEventListener("click", saveEditingSquad);
   window.addEventListener("hashchange", route);
 }
 

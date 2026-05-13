@@ -37,7 +37,7 @@
       </h1>
       <nav class="filters">
         <a href="index.html" class="filter-btn" id="back-to-map">← Karte</a>
-        <button id="new-event-btn" class="filter-btn filter-btn--alert" type="button">+ Neue Veranstaltung</button>
+        <button id="new-event-btn" class="filter-btn filter-btn--alert" type="button">+ Neue Jagd</button>
       </nav>
     </header>
 
@@ -115,11 +115,8 @@
         <button class="back-btn" id="back-to-list">← Übersicht</button>
         <div id="event-header"></div>
         <div id="event-contacts" class="ev-contacts" hidden></div>
-        <nav class="ev-tabs">
-          <button class="ev-tab active" data-tab="invites">Einladungen</button>
-          <button class="ev-tab" data-tab="squads">Ansteller Runden</button>
-        </nav>
-        <div class="ev-tab-panel" id="tab-invites">
+        <section class="ev-section">
+          <h3 class="ev-section-title">Einladungen</h3>
           <div class="invites-toolbar">
             <button type="button" id="open-address-book" class="ghost-btn">Aus Hunterbase wählen</button>
             <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
@@ -141,18 +138,20 @@
             <button id="open-invite-preview" type="button" class="primary-btn">Einladung erstellen</button>
             <span id="invite-status" class="invite-status"></span>
           </div>
-        </div>
-        <div class="ev-tab-panel" id="tab-squads" hidden>
+        </section>
+
+        <section class="ev-section ev-section--squads">
+          <h3 class="ev-section-title">Ansteller Runden</h3>
           <div class="squads-toolbar">
             <button id="new-squad-btn" type="button" class="primary-btn small">+ Neue Ansteller Runde</button>
             <span id="squads-hint" class="muted"></span>
           </div>
-          <div id="squads-list"></div>
+          <div id="squads-list" class="squads-grid"></div>
           <p id="squads-empty" class="empty-msg" hidden>
             Noch keine Ansteller Runde angelegt — oben anlegen, um Schützen
             ihre Kanzeln zuzuweisen.
           </p>
-        </div>
+        </section>
       </section>
     </main>
 
@@ -207,6 +206,19 @@
       <div class="invite-actions invite-modal-actions">
         <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
         <button id="invite-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
+
+    <div id="squad-edit-backdrop" hidden></div>
+    <section id="squad-edit-modal" hidden aria-modal="true" role="dialog" aria-labelledby="squad-edit-title">
+      <header>
+        <h2 id="squad-edit-title">Ansteller Runde</h2>
+        <button id="squad-edit-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="squad-edit-body" id="squad-edit-body"></div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="squad-edit-save" type="button" class="primary-btn">Speichern</button>
+        <button id="squad-edit-cancel" type="button" class="cancel-btn">Abbrechen</button>
       </div>
     </section>
 
