@@ -1603,7 +1603,9 @@ body.rsvp-page #rsvp-topbar {
 .event-card-wrap { position: relative; }
 
 .event-card {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 14px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1615,6 +1617,31 @@ body.rsvp-page #rsvp-topbar {
 }
 .event-card:hover { border-color: var(--green-bright-edge); }
 .event-card:active { transform: scale(0.99); }
+
+.event-card-icon {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0.88;
+  align-self: center;
+}
+
+.event-card-content { flex: 1; min-width: 0; }
+.event-card-content .event-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .event-card { gap: 10px; padding: 10px 40px 10px 10px; }
+  .event-card-icon { width: 52px; height: 52px; }
+}
 
 .event-delete-btn {
   position: absolute;

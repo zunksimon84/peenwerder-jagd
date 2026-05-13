@@ -165,6 +165,16 @@ async function loadEvents() {
   }
 }
 
+// One of four hand-drawn animals per event, picked deterministically from
+// the event id so the same card always shows the same animal across reloads.
+const EVENT_ANIMALS = ["boar", "stag", "roebuck", "fallow"];
+function pickEventAnimal(id) {
+  const s = String(id || "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return EVENT_ANIMALS[Math.abs(h) % EVENT_ANIMALS.length];
+}
+
 function renderEventsList() {
   const list = $("#events-list");
   $("#events-empty").hidden = state.events.length > 0;
@@ -172,19 +182,23 @@ function renderEventsList() {
   list.innerHTML = state.events.map((ev) => {
     const dateStr = formatDate(ev.date);
     const s = ev.stats || { invited: 0, accepted: 0, declined: 0, pending: 0 };
+    const animal = pickEventAnimal(ev.id);
     return `
       <div class="event-card-wrap">
         <a class="event-card" href="#/event/${encodeURIComponent(ev.id)}">
-          <div class="event-card-head">
-            <h3>${escapeHtml(ev.name)}</h3>
-            <span class="event-date">${escapeHtml(dateStr)}</span>
-          </div>
-          ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
-          <div class="event-stats">
-            <span class="stat stat-invited">${s.invited} eingeladen</span>
-            <span class="stat stat-accepted">${s.accepted} ✓</span>
-            <span class="stat stat-declined">${s.declined} ✗</span>
-            <span class="stat stat-pending">${s.pending} offen</span>
+          <img class="event-card-icon" src="event-icons/${animal}.png" alt="" loading="lazy" />
+          <div class="event-card-content">
+            <div class="event-card-head">
+              <h3>${escapeHtml(ev.name)}</h3>
+              <span class="event-date">${escapeHtml(dateStr)}</span>
+            </div>
+            ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
+            <div class="event-stats">
+              <span class="stat stat-invited">${s.invited} eingeladen</span>
+              <span class="stat stat-accepted">${s.accepted} ✓</span>
+              <span class="stat stat-declined">${s.declined} ✗</span>
+              <span class="stat stat-pending">${s.pending} offen</span>
+            </div>
           </div>
         </a>
         <button class="event-delete-btn" data-eid="${escapeHtml(ev.id)}" type="button" aria-label="Veranstaltung löschen" title="Veranstaltung löschen">×</button>
