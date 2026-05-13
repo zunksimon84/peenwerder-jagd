@@ -2045,17 +2045,24 @@ function rsvpRespond_(body) {
               : "";
   if (!choice) return { error: "choice must be accept or decline" };
   // Role is only meaningful on accept; allowlisted so the sheet doesn't
-  // fill with free-form junk. Schütze still accepted as a legacy synonym
-  // for the (combined) Schütze/Standschneller option.
-  const VALID_ROLES = { "Schütze/Standschneller": 1, "Schütze": 1, "Treiber": 1, "Hundeführer": 1 };
+  // fill with free-form junk. Older spellings ("Schütze", "Schütze/
+  // Standschneller") are still accepted and normalised so any existing
+  // RSVPs aren't invalidated.
+  const VALID_ROLES = {
+    "Schütze/Standschnaller": 1,
+    "Schütze/Standschneller": 1,
+    "Schütze": 1,
+    "Treiber": 1,
+    "Hundeführer": 1,
+  };
   let role = String(body.role || "").trim();
   if (role && !VALID_ROLES[role]) role = "";
-  if (role === "Schütze") role = "Schütze/Standschneller";
+  if (role === "Schütze" || role === "Schütze/Standschneller") role = "Schütze/Standschnaller";
   if (choice === "declined") role = "";
 
   // Dogs are optional and only valid for the two roles that can bring them.
   let dogs = [];
-  if (choice === "accepted" && (role === "Schütze/Standschneller" || role === "Hundeführer") &&
+  if (choice === "accepted" && (role === "Schütze/Standschnaller" || role === "Hundeführer") &&
       Array.isArray(body.dogs)) {
     const allowed = {};
     for (let k = 0; k < DOG_BREEDS.length; k++) allowed[DOG_BREEDS[k]] = 1;

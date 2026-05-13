@@ -125,7 +125,7 @@ function pickRole(role) {
     respond("accept", role, []);
     return;
   }
-  // Schütze/Standschneller or Hundeführer — show dog form (optional).
+  // Schütze/Standschnaller or Hundeführer — show dog form (optional).
   $("#dog-role-label").textContent = role;
   $("#dog-rows").innerHTML = "";
   showSection("dogs");
