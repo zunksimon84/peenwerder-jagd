@@ -1695,8 +1695,10 @@ function eventInvitesSend_(body) {
       huntersSheet.getRange(i + 2, colToken + 1).setValue(token);
     }
     const link = baseUrl.replace(/\/+$/, "") + "/rsvp.html?t=" + encodeURIComponent(token);
-    const plainBody = inviteBodyToPlain_(bodyTemplate, link);
-    const htmlBody = inviteBodyToHtml_(bodyTemplate, link);
+    const forename = forenameFor_(hunter);
+    const personalized = bodyTemplate.split("{forename}").join(forename);
+    const plainBody = inviteBodyToPlain_(personalized, link);
+    const htmlBody = inviteBodyToHtml_(personalized, link);
     try {
       MailApp.sendEmail({ to: email, subject: subject, body: plainBody, htmlBody: htmlBody });
       huntersSheet.getRange(i + 2, colInvitedAt + 1).setValue(new Date().toISOString());
@@ -1739,29 +1741,29 @@ function inviteEmailBodyTemplate_(ev) {
   const organizer = String(ev.organizer || "").trim() || "Jakob";
 
   const revier = revierFromTeilgebiete_(teilgebiet);
-  const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in **" +
+  const sentence1 = "ich möchte Dich recht herzlich zur nächsten Drückjagd in **" +
     revier + "** am **" +
     (eventDate || "[noch offen]") + "** einladen." +
     (teilgebiet ? " " + teilgebietSentence_(teilgebiet) : "");
 
   return [
-    "Liebe Freundinnen und Freunde des Waldbaus,",
+    "Hallo **{forename}**,",
     "",
     sentence1,
     "",
-    "Ich bitte Euch, mir bis zum **" + (rsvpDeadline || "[noch offen]") +
-      "** eine verbindliche Zusage zu machen, wenn und in welcher Funktion Ihr teilnehmen möchtet (Schütze/Treiber/Hundeführer). Nutzt dafür bitte ausschließlich diesen Anmeldelink:",
+    "Ich bitte Dich, mir bis zum **" + (rsvpDeadline || "[noch offen]") +
+      "** eine verbindliche Zusage zu machen, wenn und in welcher Funktion Du teilnehmen möchtest (Schütze/Treiber/Hundeführer). Nutze dafür bitte ausschließlich diesen Anmeldelink:",
     "",
     "{link}",
     "",
-    "Treiber können gerne mitgebracht werden, bitte vorher mit Namen anmelden.",
+    "Treiber kannst Du gerne mitbringen, bitte vorher mit Namen anmelden.",
     "",
     "Im Laufe des **" + (writtenInvite || "[noch offen]") +
-      "** (zwei Wochen vorher) werdet Ihr von mir dann eine schriftliche Einladung erhalten, aus der ihr alle Details zur Anreise und zum Ablauf entnehmen könnt.",
+      "** (zwei Wochen vorher) bekommst Du von mir eine schriftliche Einladung, der Du alle Details zur Anreise und zum Ablauf entnehmen kannst.",
     "",
-    "Ich freue mich auf zahlreiches Erscheinen und dass wir waidgerecht und mit Freude gemeinsam Beute machen. Horrido!",
+    "Ich freue mich, wenn Du dabei bist und wir waidgerecht und mit Freude gemeinsam Beute machen. Horrido!",
     "",
-    "euer **" + organizer + "**",
+    "Dein **" + organizer + "**",
   ].join("\n");
 }
 
@@ -1782,6 +1784,13 @@ function inviteBodyToHtml_(text, linkUrl) {
   return '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Helvetica Neue\',\'Segoe UI\',sans-serif;' +
          'font-weight:400;line-height:1.55;color:#232323;font-size:15px;max-width:640px;">' +
          html + '</div>';
+}
+
+// First whitespace-separated word of the hunter's name. "Klaus Müller"
+// → "Klaus"; "Klaus-Peter Müller" → "Klaus-Peter" (hyphen stays in the
+// first token). Used to personalize the email greeting.
+function forenameFor_(name) {
+  return String(name || "").trim().split(/\s+/)[0] || "";
 }
 
 function inviteBodyToPlain_(text, linkUrl) {
@@ -1813,7 +1822,7 @@ function inviteEmailBodyTemplateEn_(ev) {
     (teilgebiet ? " " + teilgebietSentenceEn_(teilgebiet) : "");
 
   return [
-    "Dear friends of forestry,",
+    "Hi **{forename}**,",
     "",
     sentence1,
     "",
@@ -1827,7 +1836,7 @@ function inviteEmailBodyTemplateEn_(ev) {
     "On or around **" + (writtenInvite || "[to be confirmed]") +
       "** (two weeks before) I will send you a written invitation with the details of arrival and schedule.",
     "",
-    "Looking forward to a good turnout, and may we hunt fairly and together with joy. Horrido!",
+    "Looking forward to having you join us — may we hunt fairly and with joy. Horrido!",
     "",
     "Yours, **" + organizer + "**",
   ].join("\n");

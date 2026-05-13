@@ -2583,13 +2583,30 @@ body.rsvp-page {
 .rsvp-state-accepted, .rsvp-state-declined {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 16px;
+  border-radius: 12px;
+  padding: 22px 24px;
+  text-align: left;
   color: #111;
-  margin-top: 16px;
+  margin-top: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 }
-.rsvp-state-accepted p::before { content: "✓ "; color: #1f7a31; font-weight: 700; }
-.rsvp-state-declined p::before { content: "✗ "; color: #c0392b; font-weight: 700; }
+.rsvp-state-accepted h2,
+.rsvp-state-declined h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 700;
+}
+.rsvp-state-accepted h2::before { content: "✓ "; font-weight: 700; }
+.rsvp-state-declined h2::before { content: "✗ "; font-weight: 700; }
+.rsvp-state-accepted h2 { color: #1f7a31; }
+.rsvp-state-declined h2 { color: #c0392b; }
+.rsvp-state-accepted p,
+.rsvp-state-declined p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--steel-dark);
+}
 
 .rsvp-card {
   background: var(--card);

@@ -628,7 +628,9 @@ async function sendInvites() {
   const oldText = btn.textContent;
   btn.textContent = "Sende …";
   try {
-    const baseUrl = location.href.replace(/[^/]*$/, "");
+    // Bare directory URL (strips ?query, #hash, and the events.html filename)
+    // so the backend can build .../rsvp.html?t=… correctly.
+    const baseUrl = new URL(".", location.href).href;
     const data = await postJson({
       action: "event-invites-send",
       event_id: state.currentEvent.event.id,

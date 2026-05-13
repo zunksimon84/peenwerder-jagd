@@ -121,7 +121,7 @@
         </nav>
         <div class="ev-tab-panel" id="tab-invites">
           <div class="invites-toolbar">
-            <button type="button" id="open-address-book" class="ghost-btn">Aus Adressbuch wählen</button>
+            <button type="button" id="open-address-book" class="ghost-btn">Aus Hunterbase wählen</button>
             <button type="button" id="open-csv-upload" class="ghost-btn">CSV importieren</button>
             <input type="file" id="csv-input" accept=".csv,text/csv,text/plain" hidden />
           </div>
@@ -159,17 +159,17 @@
     <div id="address-book-backdrop" hidden></div>
     <section id="address-book-modal" hidden aria-modal="true" role="dialog" aria-labelledby="address-book-title">
       <header>
-        <h2 id="address-book-title">Adressbuch</h2>
+        <h2 id="address-book-title">Hunterbase</h2>
         <button id="address-book-close" type="button" aria-label="Schließen">×</button>
       </header>
       <div class="address-book-body">
         <p class="invite-hint">
           Häkchen setzen, um einen Jäger zur Veranstaltung einzuladen — Häkchen
-          entfernen, um ihn von dieser Veranstaltung zu entfernen. Das Adressbuch
+          entfernen, um ihn von dieser Veranstaltung zu entfernen. Die Hunterbase
           selbst bleibt unverändert.
         </p>
         <div id="address-book-list" class="address-book-list"></div>
-        <p id="address-book-empty" class="empty-msg" hidden>Noch keine Kontakte im Adressbuch.</p>
+        <p id="address-book-empty" class="empty-msg" hidden>Noch keine Kontakte in der Hunterbase.</p>
       </div>
       <div class="invite-actions invite-modal-actions">
         <button id="address-book-apply" type="button" class="primary-btn">Übernehmen</button>
@@ -190,9 +190,9 @@
         </div>
         <p class="invite-hint">
           Prüfe und ändere den Text. <code>**Text**</code> erscheint im E-Mail
-          <b>fett</b>; <code>{link}</code> wird für jeden Jäger durch seinen
-          persönlichen Anmeldelink ersetzt. Jäger erhalten die Einladung in der
-          oben gewählten Sprache automatisch.
+          <b>fett</b>; <code>{forename}</code> wird durch den Vornamen des Empfängers
+          ersetzt, <code>{link}</code> durch seinen persönlichen Anmeldelink.
+          Jäger erhalten die Einladung automatisch in der gewählten Sprache.
         </p>
         <label class="invite-field">
           Betreff

@@ -33,6 +33,13 @@ function setState(msg, kind) {
   el.innerHTML = msg ? `<p>${msg}</p>` : "";
 }
 
+function setStateHtml(html, kind) {
+  const el = $("#rsvp-state");
+  el.hidden = !html;
+  el.className = "rsvp-state" + (kind ? " rsvp-state-" + kind : "");
+  el.innerHTML = html || "";
+}
+
 function showCurrentStatus(status, role, dogs) {
   const el = $("#rsvp-current");
   if (!status || status === "pending" || status === "invited") {
@@ -174,12 +181,19 @@ async function respond(choice, role, dogs) {
       const dogStr = (dogs && dogs.length)
         ? " mit " + dogs.map((d) => d.count + "× " + d.breed).join(", ")
         : "";
-      msg = "Danke! Deine Zusage als " + (role || "Teilnehmer") + dogStr + " ist registriert ✓";
+      msg =
+        "<h2>Erfolgreich angemeldet</h2>" +
+        "<p>Deine Zusage als <strong>" + escapeHtml(role || "Teilnehmer") + "</strong>" +
+        escapeHtml(dogStr) + " ist registriert.</p>" +
+        "<p>Weitere Informationen bekommst Du in Kürze per E-Mail. Bis dahin: Waidmannsheil!</p>";
     } else {
-      msg = "Schade — die Absage ist registriert.";
+      msg =
+        "<h2>Absage registriert</h2>" +
+        "<p>Schade, dass Du diesmal nicht dabei sein kannst. Falls sich etwas ändert," +
+        " kannst Du Deine Antwort jederzeit über denselben Link aktualisieren.</p>";
     }
     $("#rsvp-card").hidden = true;
-    setState(msg, choice === "accept" ? "accepted" : "declined");
+    setStateHtml(msg, choice === "accept" ? "accepted" : "declined");
   } catch (err) {
     buttons.forEach((b) => { b.disabled = false; });
     setState("Fehler: " + (err.message || err), "error");
