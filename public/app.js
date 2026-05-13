@@ -996,7 +996,9 @@ function setupProtocolFigure(fig) {
   const dotFrac = numbered ? 0.03 : 0.005;
 
   function resize() {
-    const rect = fig.getBoundingClientRect();
+    // Read the canvas's own rect — on the animals figure the canvas is
+    // shifted right of the row selectors, so it's narrower than the figure.
+    const rect = canvas.getBoundingClientRect();
     if (!rect.width) return;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(rect.width * dpr);
@@ -1034,7 +1036,9 @@ function setupProtocolFigure(fig) {
       (c) => Math.hypot((c.xr - xr) * rect.width, (c.yr - yr) * rect.height) < 18
     );
     if (hitIdx >= 0) circles.splice(hitIdx, 1);
-    else circles.push({ xr, yr });
+    // Range diagram: cap at two dots (Stück I + Stück II). Tap an existing
+    // dot to remove it before placing a third.
+    else if (!numbered || circles.length < 2) circles.push({ xr, yr });
     redraw();
   });
   protoFigures.push({ resize, clear: () => { circles.length = 0; redraw(); } });

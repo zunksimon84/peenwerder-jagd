@@ -1177,6 +1177,18 @@ body {
   touch-action: manipulation;
 }
 
+/* The animal-pose chart is shifted right so the row selectors (left edge)
+   don't overlap the first sketches. Canvas tracks the image. */
+.proto-figure[data-fig="animals"] img {
+  margin-left: 58px;
+  width: calc(100% - 58px);
+}
+.proto-figure[data-fig="animals"] canvas {
+  left: 58px;
+  right: 0;
+  width: auto;
+}
+
 /* Per-row Stück selector overlaid on the left edge of the animal-pose chart
    (top select → top row, bottom select → bottom row). */
 .proto-figure .proto-fig-row {
