@@ -231,7 +231,13 @@
               <td data-label="Uhrzeit"><input type="time" data-proto="s1_uhrzeit" /></td>
               <td data-label="Anzahl Schüsse"><select data-proto="s1_schuesse" data-range="1-10"></select></td>
               <td data-label="Wildart / gesch. kg" class="proto-cell-stack">
-                <input type="text" data-proto="s1_wildart" placeholder="Wildart" />
+                <select data-proto="s1_wildart" aria-label="Wildart">
+                  <option value="">—</option>
+                  <option>Rotwild</option>
+                  <option>Damwild</option>
+                  <option>Schwarzwild</option>
+                  <option>Rehwild</option>
+                </select>
                 <select data-proto="s1_kg" data-range="1-100" aria-label="geschätzte kg"></select>
               </td>
               <td data-label="Anzahl Stücke"><select data-proto="s1_stuecke" data-range="1-15"></select></td>
@@ -247,7 +253,13 @@
               <td data-label="Uhrzeit"><input type="time" data-proto="s2_uhrzeit" /></td>
               <td data-label="Anzahl Schüsse"><select data-proto="s2_schuesse" data-range="1-10"></select></td>
               <td data-label="Wildart / gesch. kg" class="proto-cell-stack">
-                <input type="text" data-proto="s2_wildart" placeholder="Wildart" />
+                <select data-proto="s2_wildart" aria-label="Wildart">
+                  <option value="">—</option>
+                  <option>Rotwild</option>
+                  <option>Damwild</option>
+                  <option>Schwarzwild</option>
+                  <option>Rehwild</option>
+                </select>
                 <select data-proto="s2_kg" data-range="1-100" aria-label="geschätzte kg"></select>
               </td>
               <td data-label="Anzahl Stücke"><select data-proto="s2_stuecke" data-range="1-15"></select></td>
