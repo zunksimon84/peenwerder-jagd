@@ -1599,12 +1599,14 @@ body.rsvp-page #rsvp-topbar {
   gap: 10px;
 }
 
+.event-card-wrap { position: relative; }
+
 .event-card {
   display: block;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 12px 44px 12px 14px;
   text-decoration: none;
   color: inherit;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -1612,6 +1614,27 @@ body.rsvp-page #rsvp-topbar {
 }
 .event-card:hover { border-color: var(--green-bright-edge); }
 .event-card:active { transform: scale(0.99); }
+
+.event-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  transition: background-color 0.1s, color 0.1s;
+}
+.event-delete-btn:hover {
+  background: #fbe9e7;
+  color: #c0392b;
+}
 
 .event-card-head {
   display: flex;

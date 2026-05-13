@@ -140,6 +140,10 @@ function doPost(e) {
       const r = eventSquadDelete_(body);
       return json_(r, r.error ? 400 : 200);
     }
+    if (action === "event-delete") {
+      const r = eventDelete_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
     // default — log a harvest
     const result = logHarvest_(body);
     return json_(result, result.error ? 400 : 200);
@@ -1860,6 +1864,41 @@ function eventSquadSave_(body) {
     members: membersJson,
   });
   return { ok: true, id: newId };
+}
+
+// Deletes an event row plus every row in event_hunters / event_squads that
+// belongs to it. Iterates bottom-up so deletion indexes stay valid.
+function eventDelete_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const events = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  const hunters = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const squads = ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
+
+  function deleteWhere(sheet, column, value) {
+    const last = sheet.getLastRow();
+    if (last < 2) return 0;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function (s) { return String(s).trim(); });
+    const col = headers.indexOf(column);
+    if (col < 0) return 0;
+    const vals = sheet.getRange(2, col + 1, last - 1, 1).getValues();
+    let removed = 0;
+    for (let i = vals.length - 1; i >= 0; i--) {
+      if (String(vals[i][0]).trim() === value) {
+        sheet.deleteRow(i + 2);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  const huntersRemoved = deleteWhere(hunters, "event_id", id);
+  const squadsRemoved = deleteWhere(squads, "event_id", id);
+  const eventRemoved = deleteWhere(events, "id", id);
+  if (!eventRemoved) return { error: "not found" };
+  return { ok: true, hunters_removed: huntersRemoved, squads_removed: squadsRemoved };
 }
 
 function eventSquadDelete_(body) {

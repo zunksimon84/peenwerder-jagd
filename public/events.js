@@ -173,21 +173,37 @@ function renderEventsList() {
     const dateStr = formatDate(ev.date);
     const s = ev.stats || { invited: 0, accepted: 0, declined: 0, pending: 0 };
     return `
-      <a class="event-card" href="#/event/${encodeURIComponent(ev.id)}">
-        <div class="event-card-head">
-          <h3>${escapeHtml(ev.name)}</h3>
-          <span class="event-date">${escapeHtml(dateStr)}</span>
-        </div>
-        ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
-        <div class="event-stats">
-          <span class="stat stat-invited">${s.invited} eingeladen</span>
-          <span class="stat stat-accepted">${s.accepted} ✓</span>
-          <span class="stat stat-declined">${s.declined} ✗</span>
-          <span class="stat stat-pending">${s.pending} offen</span>
-        </div>
-      </a>
+      <div class="event-card-wrap">
+        <a class="event-card" href="#/event/${encodeURIComponent(ev.id)}">
+          <div class="event-card-head">
+            <h3>${escapeHtml(ev.name)}</h3>
+            <span class="event-date">${escapeHtml(dateStr)}</span>
+          </div>
+          ${ev.treffpunkt ? `<p class="event-meta">${escapeHtml(ev.treffpunkt)}${ev.treff_time ? " · " + escapeHtml(ev.treff_time) : ""}</p>` : ""}
+          <div class="event-stats">
+            <span class="stat stat-invited">${s.invited} eingeladen</span>
+            <span class="stat stat-accepted">${s.accepted} ✓</span>
+            <span class="stat stat-declined">${s.declined} ✗</span>
+            <span class="stat stat-pending">${s.pending} offen</span>
+          </div>
+        </a>
+        <button class="event-delete-btn" data-eid="${escapeHtml(ev.id)}" type="button" aria-label="Veranstaltung löschen" title="Veranstaltung löschen">×</button>
+      </div>
     `;
   }).join("");
+}
+
+async function deleteEvent(id) {
+  const ev = state.events.find((e) => e.id === id);
+  const name = ev ? ev.name : "diese Veranstaltung";
+  if (!confirm("„" + name + "“ wirklich löschen? Alle Einladungen, RSVPs und Squads werden mit gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.")) return;
+  try {
+    await postJson({ action: "event-delete", id });
+    showToast("Veranstaltung gelöscht ✓");
+    await loadEvents();
+  } catch (err) {
+    showToast(err.message || "Fehler beim Löschen", "error");
+  }
 }
 
 function formatDate(iso) {
@@ -475,6 +491,14 @@ function wireUi() {
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");
     if (btn) removeHunter(btn.dataset.hid);
+  });
+  $("#events-list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".event-delete-btn");
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      deleteEvent(btn.dataset.eid);
+    }
   });
   $$(".ev-tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   window.addEventListener("hashchange", route);
