@@ -1587,6 +1587,40 @@ body.rsvp-page #rsvp-topbar {
   margin: 12px 0;
 }
 
+/* Running-boar loading indicator. Uses a horizontal sprite + steps() so the
+   browser only needs to shift background-position (compositor-only, no
+   per-frame image decoding) and stays cheap on CPU. */
+.boar-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.boar-loader::before {
+  content: "";
+  display: inline-block;
+  width: 64px;
+  height: 40px;
+  background: url("boar-sprite.png") 0 0 / 768px 40px no-repeat;
+  animation: boar-run 0.9s steps(12) infinite;
+  flex-shrink: 0;
+  /* Hint the renderer this is a long-running animation so it stays on its
+     own GPU layer. */
+  will-change: background-position;
+}
+.boar-loader--center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.boar-loader--small::before { transform: scale(0.65); transform-origin: left center; width: 42px; height: 26px; }
+
+@keyframes boar-run {
+  from { background-position: 0 0; }
+  to   { background-position: -768px 0; }
+}
+
 .ev-error {
   color: var(--accent);
   font-size: 14px;

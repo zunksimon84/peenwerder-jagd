@@ -155,7 +155,7 @@ function route() {
 
 async function loadEvents() {
   const list = $("#events-list");
-  list.innerHTML = "<p class='ev-loading'>Lade …</p>";
+  list.innerHTML = "<div class='boar-loader boar-loader--center'>Lade …</div>";
   try {
     state.events = await fetchJson("events-list");
     renderEventsList();
@@ -273,7 +273,7 @@ async function submitNewEvent(e) {
 // ---------- Detail ----------
 
 async function loadEventDetail(id) {
-  $("#event-header").innerHTML = "<p class='ev-loading'>Lade …</p>";
+  $("#event-header").innerHTML = "<div class='boar-loader boar-loader--center'>Lade …</div>";
   $("#hunters-list").innerHTML = "";
   try {
     state.currentEvent = await fetchJson("event-detail", { id });
