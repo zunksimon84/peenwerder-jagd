@@ -62,7 +62,11 @@ const DOG_BREEDS = [
   "Irish Red and White Setter", "Welsh Springer Spaniel",
   "Sonstige",
 ];
-const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members"];
+// "Squad" is the legacy label — in German hunting we call this an
+// "Ansteller Runde" (a group led by one Ansteller). Old columns
+// (post_id/post_name/members) are kept so existing rows aren't broken;
+// new rows only use ansteller + positions (JSON of Schützen).
+const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members", "ansteller", "positions"];
 const ADDRESS_BOOK_HEADER = ["name", "email", "language"];
 
 // ---------- HTTP entrypoints ----------
@@ -1472,15 +1476,14 @@ function eventDetail_(params) {
   const squads = readSheet_(SHEETS.event_squads, EVENT_SQUAD_HEADER)
     .filter(function (s) { return String(s.event_id) === id; })
     .map(function (s) {
-      let members = [];
-      try { members = JSON.parse(String(s.members || "[]")); } catch (e) {}
+      let positions = [];
+      try { positions = JSON.parse(String(s.positions || "[]")); } catch (e) {}
       return {
         id: String(s.id),
         name: String(s.name || ""),
-        post_id: String(s.post_id || ""),
-        post_name: String(s.post_name || ""),
+        ansteller: String(s.ansteller || ""),
+        positions: Array.isArray(positions) ? positions : [],
         briefing: String(s.briefing || ""),
-        members: Array.isArray(members) ? members : [],
       };
     });
   let nsfList = [];
@@ -2085,26 +2088,51 @@ function eventSquadSave_(body) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
   const name = String(body.name || "").trim();
-  const postId = String(body.post_id || "").trim();
-  const postName = String(body.post_name || "").trim();
+  const ansteller = String(body.ansteller || "").trim();
   const briefing = String(body.briefing || "").trim();
-  const members = Array.isArray(body.members)
-    ? body.members.filter(function (m) { return typeof m === "string" && m.trim(); }).map(function (m) { return m.trim(); })
+  const positions = Array.isArray(body.positions)
+    ? body.positions
+        .filter(function (p) { return p && String(p.hunter || "").trim(); })
+        .map(function (p) {
+          const lat = Number(p.lat);
+          const lng = Number(p.lng);
+          return {
+            hunter: String(p.hunter || "").trim(),
+            type: p.type === "klettersitz" ? "klettersitz" : "kanzel",
+            post_id: String(p.post_id || "").trim(),
+            post_name: String(p.post_name || "").trim(),
+            lat: Number.isFinite(lat) ? lat : "",
+            lng: Number.isFinite(lng) ? lng : "",
+            label: String(p.label || "").trim().slice(0, 60),
+          };
+        })
     : [];
-  const membersJson = JSON.stringify(members);
+  const positionsJson = JSON.stringify(positions);
+
+  function writeAnstellerRow(rowIdx /* 1-based sheet row */) {
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function (s) { return String(s).trim(); });
+    const update = {
+      event_id: eventId,
+      name: name,
+      ansteller: ansteller,
+      positions: positionsJson,
+      briefing: briefing,
+    };
+    Object.keys(update).forEach(function (k) {
+      const c = headers.indexOf(k);
+      if (c >= 0) sheet.getRange(rowIdx, c + 1).setValue(update[k]);
+    });
+  }
+
   const id = String(body.id || "").trim();
   if (id) {
-    // Update existing row.
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return { error: "not found" };
-    const rows = sheet.getRange(2, 1, lastRow - 1, EVENT_SQUAD_HEADER.length).getValues();
-    const headers = sheet.getRange(1, 1, 1, EVENT_SQUAD_HEADER.length).getValues()[0]
-      .map(function (s) { return String(s).trim(); });
-    const idCol = headers.indexOf("id");
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][idCol]) === id) {
-        const row = [id, eventId, name, postId, postName, briefing, membersJson];
-        sheet.getRange(i + 2, 1, 1, EVENT_SQUAD_HEADER.length).setValues([row]);
+    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim() === id) {
+        writeAnstellerRow(i + 2);
         return { ok: true, id: id };
       }
     }
@@ -2115,10 +2143,9 @@ function eventSquadSave_(body) {
     id: newId,
     event_id: eventId,
     name: name,
-    post_id: postId,
-    post_name: postName,
+    ansteller: ansteller,
+    positions: positionsJson,
     briefing: briefing,
-    members: membersJson,
   });
   return { ok: true, id: newId };
 }

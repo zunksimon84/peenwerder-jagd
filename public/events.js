@@ -11,6 +11,8 @@ const state = {
   events: [],
   addressBook: [],
   currentEvent: null,  // { event, hunters, squads }
+  posts: [],           // Kanzeln, used for Ansteller-Runden Position-Dropdown
+  postsLoaded: false,
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -406,6 +408,7 @@ function renderEventDetail() {
   `;
   renderContactsBlock(event);
   renderHuntersList(hunters);
+  if (state.postsLoaded) renderSquads();
 }
 
 function formatLongDate(iso) {
@@ -891,6 +894,330 @@ function switchTab(tab) {
   $$(".ev-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
   $("#tab-invites").hidden = tab !== "invites";
   $("#tab-squads").hidden = tab !== "squads";
+  if (tab === "squads") {
+    loadPostsIfNeeded().then(renderSquads);
+  }
+}
+
+// ---------- Ansteller Runden (squads) ----------
+// Each Ansteller Runde = one Ansteller (group leader) + several Schützen,
+// each assigned to a Kanzel (from the event's Teilgebiet) or to a
+// Klettersitz with coordinates. Only accepted hunters appear in the picker.
+
+async function loadPostsIfNeeded() {
+  if (state.postsLoaded) return;
+  // The map app caches bootstrap under the same key — re-use it.
+  const cached = readCache("bootstrap");
+  if (cached && Array.isArray(cached.posts)) {
+    state.posts = cached.posts;
+    state.postsLoaded = true;
+    return;
+  }
+  try {
+    const data = await fetchJson("bootstrap");
+    state.posts = Array.isArray(data.posts) ? data.posts : [];
+    state.postsLoaded = true;
+    writeCache("bootstrap", null, data);
+  } catch (err) {
+    state.posts = [];
+    state.postsLoaded = true; // avoid retry loop
+  }
+}
+
+function getAcceptedHunters() {
+  return (state.currentEvent?.hunters || []).filter((h) => h.status === "accepted");
+}
+
+// Filter posts to only those whose `area` matches one of the event's
+// Teilgebiete. For NPA-Müritz the corresponding areas (Babke, Langenhagen,
+// Schwarzenhof) currently have no posts, so this naturally returns empty
+// and forces Klettersitz with manual coordinates.
+function getKanzelnForEvent() {
+  if (!state.currentEvent) return [];
+  const teilgebiete = new Set(
+    (state.currentEvent.event.teilgebiet || "").split(/\s*,\s*/).filter(Boolean)
+  );
+  return state.posts.filter((p) => teilgebiete.has(p.area))
+    .sort((a, b) => a.name.localeCompare(b.name, "de"));
+}
+
+function nextAnstellerRundeName() {
+  const existing = state.currentEvent?.squads || [];
+  // Find the highest "Ansteller Runde N" and add 1.
+  let max = 0;
+  for (const s of existing) {
+    const m = /Ansteller Runde\s+(\d+)/i.exec(s.name || "");
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return "Ansteller Runde " + (max + 1);
+}
+
+function renderSquads() {
+  const wrap = $("#squads-list");
+  const empty = $("#squads-empty");
+  const hint = $("#squads-hint");
+  const squads = state.currentEvent?.squads || [];
+  if (!squads.length) {
+    wrap.innerHTML = "";
+    empty.hidden = false;
+  } else {
+    empty.hidden = true;
+    wrap.innerHTML = squads.map((s) => renderSquadCard(s)).join("");
+    squads.forEach((s) => wireSquadCard(document.getElementById("squad-" + s.id), s));
+  }
+  // Helpful note if no Kanzeln are available (NPA-Müritz or no Teilgebiet picked).
+  const kanzeln = getKanzelnForEvent();
+  if (state.posts.length && !kanzeln.length) {
+    hint.textContent = "Keine Kanzeln im gewählten Teilgebiet hinterlegt — bitte „Klettersitz" mit Koordinaten verwenden.";
+  } else {
+    hint.textContent = "";
+  }
+}
+
+function renderSquadCard(squad) {
+  const accepted = getAcceptedHunters();
+  const anstellerOptions = anstellerSelectHtml(accepted, squad.ansteller);
+  const positionsHtml = (squad.positions || []).map((p, i) =>
+    renderSchuetzeRow(p, i, accepted)
+  ).join("");
+  return `
+    <article class="squad-card" id="squad-${escapeHtml(squad.id)}" data-sid="${escapeHtml(squad.id)}">
+      <header class="squad-head">
+        <h3 class="squad-name">${escapeHtml(squad.name || "Ansteller Runde")}</h3>
+        <button class="link-btn squad-delete" type="button" aria-label="Runde löschen" title="Runde löschen">×</button>
+      </header>
+      <label class="squad-field">
+        <span class="squad-field-label">Ansteller</span>
+        <select class="squad-ansteller">${anstellerOptions}</select>
+      </label>
+      <p class="squad-field-label squad-schuetzen-title">Schützen</p>
+      <div class="schuetzen-list">${positionsHtml}</div>
+      <button class="ghost-btn squad-add-schuetze" type="button">+ Schütze hinzufügen</button>
+      <label class="squad-field">
+        <span class="squad-field-label">Bemerkung <span class="muted">(optional)</span></span>
+        <textarea class="squad-briefing" rows="2">${escapeHtml(squad.briefing || "")}</textarea>
+      </label>
+      <div class="squad-actions">
+        <button class="primary-btn small squad-save" type="button">Speichern</button>
+        <span class="squad-status muted"></span>
+      </div>
+    </article>
+  `;
+}
+
+function anstellerSelectHtml(accepted, currentValue) {
+  const opts = accepted.map((h) => {
+    const sel = (h.hunter === currentValue) ? " selected" : "";
+    return `<option value="${escapeHtml(h.hunter)}"${sel}>${escapeHtml(h.hunter)}</option>`;
+  }).join("");
+  return `<option value="">— Ansteller wählen —</option>${opts}`;
+}
+
+function hunterSelectHtml(accepted, currentValue) {
+  const opts = accepted.map((h) => {
+    const sel = (h.hunter === currentValue) ? " selected" : "";
+    return `<option value="${escapeHtml(h.hunter)}"${sel}>${escapeHtml(h.hunter)}</option>`;
+  }).join("");
+  return `<option value="">— Jäger wählen —</option>${opts}`;
+}
+
+function positionSelectHtml(currentPosition) {
+  const kanzeln = getKanzelnForEvent();
+  const currentValue = currentPosition && currentPosition.type === "kanzel"
+    ? "kanzel:" + (currentPosition.post_id || "")
+    : currentPosition && currentPosition.type === "klettersitz"
+      ? "klettersitz" : "";
+  const groupOptions = kanzeln.map((p) => {
+    const v = "kanzel:" + p.id;
+    const sel = (v === currentValue) ? " selected" : "";
+    return `<option value="${escapeHtml(v)}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.area)})</option>`;
+  }).join("");
+  const selKlettersitz = (currentValue === "klettersitz") ? " selected" : "";
+  return `
+    <option value="">— Position wählen —</option>
+    ${kanzeln.length ? `<optgroup label="Kanzel">${groupOptions}</optgroup>` : ""}
+    <option value="klettersitz"${selKlettersitz}>Klettersitz (Koordinaten)</option>
+  `;
+}
+
+function renderSchuetzeRow(pos, idx, accepted) {
+  const isKlettersitz = pos && pos.type === "klettersitz";
+  const lat = pos && pos.lat !== undefined && pos.lat !== "" ? Number(pos.lat).toFixed(6) : "";
+  const lng = pos && pos.lng !== undefined && pos.lng !== "" ? Number(pos.lng).toFixed(6) : "";
+  return `
+    <div class="schuetze-row" data-idx="${idx}">
+      <div class="sr-line sr-hunter-line">
+        <span class="sr-num">${idx + 1}.</span>
+        <select class="sr-hunter">${hunterSelectHtml(accepted, pos && pos.hunter)}</select>
+        <button class="link-btn sr-remove" type="button" aria-label="Schützen entfernen">×</button>
+      </div>
+      <div class="sr-line sr-position-line">
+        <select class="sr-position">${positionSelectHtml(pos)}</select>
+      </div>
+      <div class="sr-coords" ${isKlettersitz ? "" : "hidden"}>
+        <div class="sr-coords-grid">
+          <input type="number" class="sr-lat" step="0.000001" inputmode="decimal" value="${lat}" placeholder="Breitengrad" />
+          <input type="number" class="sr-lng" step="0.000001" inputmode="decimal" value="${lng}" placeholder="Längengrad" />
+        </div>
+        <div class="sr-coords-grid">
+          <input type="text" class="sr-label" value="${escapeHtml(pos && pos.label || "")}" maxlength="60" placeholder="Bezeichnung (optional)" />
+          <button class="ghost-btn sr-here" type="button" title="Aktuelle Position">📍</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function wireSquadCard(card, squad) {
+  if (!card) return;
+  // Delete the whole Runde.
+  card.querySelector(".squad-delete").addEventListener("click", async () => {
+    if (!confirm(`„${squad.name}" wirklich löschen?`)) return;
+    try {
+      await postJson({ action: "event-squad-delete", id: squad.id });
+      invalidateCache("event-detail", { id: state.currentEvent.event.id });
+      await loadEventDetail(state.currentEvent.event.id);
+    } catch (err) {
+      showToast(err.message || "Fehler", "error");
+    }
+  });
+  // Add a new Schütze row.
+  card.querySelector(".squad-add-schuetze").addEventListener("click", () => {
+    const list = card.querySelector(".schuetzen-list");
+    const idx = list.querySelectorAll(".schuetze-row").length;
+    const accepted = getAcceptedHunters();
+    list.insertAdjacentHTML("beforeend", renderSchuetzeRow(null, idx, accepted));
+    wireSchuetzeRow(list.lastElementChild);
+  });
+  // Wire existing rows.
+  card.querySelectorAll(".schuetze-row").forEach(wireSchuetzeRow);
+  // Save.
+  card.querySelector(".squad-save").addEventListener("click", () => saveSquadCard(card, squad));
+}
+
+function wireSchuetzeRow(row) {
+  if (!row) return;
+  row.querySelector(".sr-remove").addEventListener("click", () => {
+    row.remove();
+  });
+  const posSel = row.querySelector(".sr-position");
+  const coords = row.querySelector(".sr-coords");
+  posSel.addEventListener("change", () => {
+    coords.hidden = posSel.value !== "klettersitz";
+  });
+  const here = row.querySelector(".sr-here");
+  if (here) {
+    here.addEventListener("click", () => {
+      if (!navigator.geolocation) { showToast("Standort nicht verfügbar", "error"); return; }
+      navigator.geolocation.getCurrentPosition((pos) => {
+        row.querySelector(".sr-lat").value = pos.coords.latitude.toFixed(6);
+        row.querySelector(".sr-lng").value = pos.coords.longitude.toFixed(6);
+        showToast("Position übernommen");
+      }, (err) => showToast("Standort: " + err.message, "error", 4000),
+      { enableHighAccuracy: true, timeout: 8000 });
+    });
+  }
+}
+
+function collectPositions(card) {
+  const rows = card.querySelectorAll(".schuetze-row");
+  const positions = [];
+  rows.forEach((row) => {
+    const hunter = row.querySelector(".sr-hunter").value.trim();
+    if (!hunter) return; // skip empty rows
+    const posVal = row.querySelector(".sr-position").value;
+    if (posVal === "klettersitz") {
+      const lat = row.querySelector(".sr-lat").value.trim();
+      const lng = row.querySelector(".sr-lng").value.trim();
+      const label = row.querySelector(".sr-label").value.trim();
+      positions.push({
+        hunter,
+        type: "klettersitz",
+        lat: lat ? Number(lat) : "",
+        lng: lng ? Number(lng) : "",
+        label,
+      });
+    } else if (posVal && posVal.startsWith("kanzel:")) {
+      const post_id = posVal.slice("kanzel:".length);
+      const post = state.posts.find((p) => p.id === post_id);
+      positions.push({
+        hunter,
+        type: "kanzel",
+        post_id,
+        post_name: post ? post.name : "",
+      });
+    } else {
+      // No position picked yet — keep the hunter so the row is preserved.
+      positions.push({ hunter, type: "kanzel", post_id: "", post_name: "" });
+    }
+  });
+  return positions;
+}
+
+async function saveSquadCard(card, squad) {
+  const btn = card.querySelector(".squad-save");
+  const status = card.querySelector(".squad-status");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Speichere …";
+  status.textContent = "";
+  try {
+    const positions = collectPositions(card);
+    const ansteller = card.querySelector(".squad-ansteller").value.trim();
+    const briefing = card.querySelector(".squad-briefing").value.trim();
+    await postJson({
+      action: "event-squad-save",
+      id: squad.id,
+      event_id: state.currentEvent.event.id,
+      name: squad.name,
+      ansteller,
+      positions,
+      briefing,
+    });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    status.textContent = "Gespeichert ✓";
+    setTimeout(() => { status.textContent = ""; }, 2500);
+    // Update local state without re-rendering the whole list (preserves
+    // user's place in the form if they edit multiple cards).
+    const squads = state.currentEvent.squads;
+    const idx = squads.findIndex((x) => x.id === squad.id);
+    if (idx >= 0) squads[idx] = { ...squad, ansteller, positions, briefing };
+  } catch (err) {
+    showToast(err.message || "Fehler beim Speichern", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+async function addSquad() {
+  if (!state.currentEvent) return;
+  await loadPostsIfNeeded();
+  const accepted = getAcceptedHunters();
+  if (!accepted.length) {
+    showToast("Erst Zusagen einsammeln — Ansteller Runden brauchen mind. einen zugesagten Jäger.", "error", 5000);
+    return;
+  }
+  try {
+    const r = await postJson({
+      action: "event-squad-save",
+      event_id: state.currentEvent.event.id,
+      name: nextAnstellerRundeName(),
+      ansteller: "",
+      positions: [],
+      briefing: "",
+    });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    await loadEventDetail(state.currentEvent.event.id);
+    // Re-show the squads tab and scroll the new card into view.
+    switchTab("squads");
+    requestAnimationFrame(() => {
+      const card = document.getElementById("squad-" + r.id);
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  }
 }
 
 // ---------- Wiring ----------
@@ -937,6 +1264,7 @@ function wireUi() {
   $$(".invite-lang-tab").forEach((b) => {
     b.addEventListener("click", () => showInviteLang(b.dataset.lang));
   });
+  $("#new-squad-btn").addEventListener("click", addSquad);
   $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");

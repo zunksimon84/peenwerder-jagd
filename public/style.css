@@ -2083,6 +2083,144 @@ body.rsvp-page #rsvp-topbar {
 
 .ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
 
+/* Ansteller Runden ---------------------------------------------------------- */
+
+.squads-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.squads-toolbar .muted { font-size: 12px; }
+
+#squads-list { display: flex; flex-direction: column; gap: 14px; }
+
+.squad-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.squad-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 10px;
+}
+.squad-name { margin: 0; font-size: 16px; font-weight: 700; }
+.squad-delete {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+}
+.squad-delete:hover { background: #fbe9e7; color: var(--accent); }
+
+.squad-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+.squad-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+.squad-schuetzen-title { margin: 12px 0 6px; }
+
+.squad-field select,
+.squad-field textarea {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.schuetzen-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+
+.schuetze-row {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sr-line { display: flex; gap: 6px; align-items: center; }
+.sr-hunter-line .sr-num {
+  flex: 0 0 22px;
+  text-align: right;
+  font-weight: 700;
+  color: var(--muted);
+}
+.sr-hunter, .sr-position {
+  flex: 1;
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+  min-width: 0;
+}
+.sr-remove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.sr-remove:hover { background: #fbe9e7; color: var(--accent); }
+
+.sr-coords { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.sr-coords-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.sr-coords-grid:last-child { grid-template-columns: 1fr auto; }
+.sr-coords input {
+  font: inherit;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+  min-width: 0;
+}
+.sr-here { padding: 6px 10px; font-size: 14px; }
+
+.squad-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.squad-status { font-size: 13px; }
+
+@media (max-width: 480px) {
+  .squad-card { padding: 10px 12px; }
+  .sr-coords-grid:last-child { grid-template-columns: 1fr; }
+}
+
 /* Add-hunter form ---------------------------------------------------------- */
 
 .invites-toolbar {
