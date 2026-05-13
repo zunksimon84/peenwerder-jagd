@@ -1871,20 +1871,105 @@ body.rsvp-page #rsvp-topbar {
 }
 .back-btn:hover { color: #111; }
 
-#event-header {
-  margin-bottom: 14px;
+#event-header { margin-bottom: 14px; }
+
+/* "Landing page" hero for the event detail view. */
+.ev-hero {
+  background: linear-gradient(135deg, var(--green-bright) 0%, #c1dc59 100%);
+  border: 1px solid var(--green-bright-edge);
+  border-radius: 12px;
+  padding: 18px 18px 16px;
+  color: #111;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
-.ev-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
-.ev-subline { margin: 2px 0; color: var(--steel-dark); font-size: 13px; }
-.ev-times { color: var(--muted); }
+.ev-hero-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.ev-hero-date {
+  margin: 6px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+/* Labelled info list (Treffpunkt / Teilgebiet / Anmeldeschluss). */
+.ev-info-list {
+  margin-top: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ev-info-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.ev-info-row:first-child { border-top: none; }
+.ev-info-row .ev-info-label {
+  flex: 0 0 130px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+.ev-info-row .ev-info-value { color: #111; font-weight: 500; }
+
+/* Stats strip for Treff / Beginn / Ende. */
+.ev-times-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.ev-time {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.ev-time-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.ev-time-value {
+  display: block;
+  font-size: 19px;
+  font-weight: 700;
+  color: #111;
+  font-variant-numeric: tabular-nums;
+}
+
 .ev-briefing {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   padding: 8px 12px;
   background: var(--bg);
   border-left: 3px solid var(--green-bright);
   border-radius: 4px;
   white-space: pre-wrap;
   font-size: 13px;
+  color: var(--steel-dark);
+}
+
+@media (max-width: 480px) {
+  .ev-hero { padding: 16px 16px 14px; }
+  .ev-hero-title { font-size: 22px; }
+  .ev-hero-date { font-size: 14px; }
+  .ev-info-row .ev-info-label { flex: 0 0 110px; }
 }
 
 .ev-tabs {

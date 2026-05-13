@@ -1422,13 +1422,13 @@ function eventsList_() {
     return {
       id: String(ev.id),
       name: String(ev.name || ""),
-      date: String(ev.date || ""),
+      date: toDateString_(ev.date),
       teilgebiet: String(ev.teilgebiet || ""),
-      rsvp_deadline: String(ev.rsvp_deadline || ""),
+      rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
-      treff_time: String(ev.treff_time || ""),
-      start_time: String(ev.start_time || ""),
-      end_time: String(ev.end_time || ""),
+      treff_time: toTimeString_(ev.treff_time),
+      start_time: toTimeString_(ev.start_time),
+      end_time: toTimeString_(ev.end_time),
       organizer: String(ev.organizer || ""),
       status: String(ev.status || ""),
       stats: stats,
@@ -1482,13 +1482,13 @@ function eventDetail_(params) {
     event: {
       id: String(ev.id),
       name: String(ev.name || ""),
-      date: String(ev.date || ""),
+      date: toDateString_(ev.date),
       teilgebiet: String(ev.teilgebiet || ""),
-      rsvp_deadline: String(ev.rsvp_deadline || ""),
+      rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
-      treff_time: String(ev.treff_time || ""),
-      start_time: String(ev.start_time || ""),
-      end_time: String(ev.end_time || ""),
+      treff_time: toTimeString_(ev.treff_time),
+      start_time: toTimeString_(ev.start_time),
+      end_time: toTimeString_(ev.end_time),
       briefing: String(ev.briefing || ""),
       organizer: String(ev.organizer || ""),
       status: String(ev.status || ""),
@@ -1601,9 +1601,10 @@ function eventInvitesSend_(body) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const eventsSheet = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
   const huntersSheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
-  const ev = readSheet_(SHEETS.events, EVENT_HEADER)
+  const rawEv = readSheet_(SHEETS.events, EVENT_HEADER)
     .find(function (e) { return String(e.id) === eventId; });
-  if (!ev) return { error: "event not found" };
+  if (!rawEv) return { error: "event not found" };
+  const ev = normalizeEventDates_(rawEv);
   const baseUrl = String(body.base_url || "").trim();
   if (!baseUrl) return { error: "base_url required (the site origin so the magic-link works)" };
 
@@ -1717,12 +1718,38 @@ function invitePreview_(params) {
   if (!id) return { error: "event_id required" };
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
-  const ev = readSheet_(SHEETS.events, EVENT_HEADER)
+  const raw = readSheet_(SHEETS.events, EVENT_HEADER)
     .find(function (e) { return String(e.id) === id; });
-  if (!ev) return { error: "event not found" };
+  if (!raw) return { error: "event not found" };
+  const ev = normalizeEventDates_(raw);
   return {
     subject: inviteSubject_(ev),
     body: inviteEmailBodyTemplate_(ev),
+  };
+}
+
+// Strip Google Sheets' Date typing on the four date/time columns so anything
+// that consumes `ev` (the email template, formatters) sees ISO strings.
+function normalizeEventDates_(ev) {
+  if (!ev) return ev;
+  return {
+    id: ev.id,
+    name: ev.name,
+    date: toDateString_(ev.date),
+    teilgebiet: ev.teilgebiet,
+    rsvp_deadline: toDateString_(ev.rsvp_deadline),
+    treffpunkt: ev.treffpunkt,
+    treff_time: toTimeString_(ev.treff_time),
+    start_time: toTimeString_(ev.start_time),
+    end_time: toTimeString_(ev.end_time),
+    briefing: ev.briefing,
+    organizer: ev.organizer,
+    status: ev.status,
+    vet_name: ev.vet_name,
+    vet_phone: ev.vet_phone,
+    coordinator_name: ev.coordinator_name,
+    coordinator_phone: ev.coordinator_phone,
+    nachsuchenfuehrer: ev.nachsuchenfuehrer,
   };
 }
 
@@ -1746,6 +1773,27 @@ function formatGermanDate_(isoDate) {
   const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni",
                   "Juli", "August", "September", "Oktober", "November", "Dezember"];
   return parseInt(m[3], 10) + ". " + MONTHS[parseInt(m[2], 10) - 1] + " " + m[1];
+}
+
+// Google Sheets auto-types date and time cells as JS Date objects, so a
+// "2026-12-12" cell comes back as `Sat Dec 12 2026 00:00:00 GMT+0100 …` when
+// stringified. These helpers re-format dates back to ISO YYYY-MM-DD and
+// times to HH:mm, using the spreadsheet's own timezone so a 07:30 cell
+// doesn't drift to 06:30 in UTC.
+function toDateString_(v) {
+  if (!v && v !== 0) return "";
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || "Europe/Berlin", "yyyy-MM-dd");
+  }
+  return String(v).trim();
+}
+
+function toTimeString_(v) {
+  if (!v && v !== 0) return "";
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || "Europe/Berlin", "HH:mm");
+  }
+  return String(v).trim();
 }
 
 function addDays_(isoDate, days) {
@@ -1781,13 +1829,13 @@ function rsvpInfo_(params) {
     breeds: DOG_BREEDS,
     event: {
       name: String(ev.name || ""),
-      date: String(ev.date || ""),
+      date: toDateString_(ev.date),
       teilgebiet: String(ev.teilgebiet || ""),
-      rsvp_deadline: String(ev.rsvp_deadline || ""),
+      rsvp_deadline: toDateString_(ev.rsvp_deadline),
       treffpunkt: String(ev.treffpunkt || ""),
-      treff_time: String(ev.treff_time || ""),
-      start_time: String(ev.start_time || ""),
-      end_time: String(ev.end_time || ""),
+      treff_time: toTimeString_(ev.treff_time),
+      start_time: toTimeString_(ev.start_time),
+      end_time: toTimeString_(ev.end_time),
       briefing: String(ev.briefing || ""),
       organizer: String(ev.organizer || ""),
     },

@@ -272,25 +272,58 @@ async function loadEventDetail(id) {
 function renderEventDetail() {
   const { event, hunters } = state.currentEvent;
   const header = $("#event-header");
-  const dateStr = formatDate(event.date);
-  const meta = [
-    event.treff_time ? `Treff ${event.treff_time}` : "",
-    event.start_time ? `Beginn ${event.start_time}` : "",
-    event.end_time ? `Ende ${event.end_time}` : "",
-  ].filter(Boolean).join(" · ");
-  const subline2 = [
-    event.teilgebiet ? "Teilgebiet " + event.teilgebiet : "",
-    event.rsvp_deadline ? "Anmeldeschluss " + formatDate(event.rsvp_deadline) : "",
-  ].filter(Boolean).join(" · ");
+  const dateLong = formatLongDate(event.date);
+  const dateShort = formatDate(event.date);
+  // Singular/plural just like the email — "Teilgebiet" vs "Teilgebiete".
+  const teilgebietParts = (event.teilgebiet || "").split(/\s*,\s*/).filter(Boolean);
+  const teilgebietLabel = teilgebietParts.length > 1 ? "Teilgebiete" : "Teilgebiet";
+  const teilgebietValue = teilgebietParts.join(", ");
+  const infoRows = [];
+  if (event.treffpunkt) infoRows.push({ label: "Treffpunkt", value: event.treffpunkt });
+  if (teilgebietValue) infoRows.push({ label: teilgebietLabel, value: teilgebietValue });
+  if (event.rsvp_deadline) infoRows.push({ label: "Anmeldeschluss", value: formatLongDate(event.rsvp_deadline) });
+  const times = [
+    event.treff_time ? { label: "Treff", value: event.treff_time + " Uhr" } : null,
+    event.start_time ? { label: "Beginn", value: event.start_time + " Uhr" } : null,
+    event.end_time ? { label: "Ende", value: event.end_time + " Uhr" } : null,
+  ].filter(Boolean);
   header.innerHTML = `
-    <h2 class="ev-title">${escapeHtml(event.name)}</h2>
-    <p class="ev-subline">${escapeHtml(dateStr)}${event.treffpunkt ? " · " + escapeHtml(event.treffpunkt) : ""}</p>
-    ${subline2 ? `<p class="ev-subline">${escapeHtml(subline2)}</p>` : ""}
-    ${meta ? `<p class="ev-subline ev-times">${escapeHtml(meta)}</p>` : ""}
+    <div class="ev-hero">
+      <h2 class="ev-hero-title">${escapeHtml(event.name)}</h2>
+      ${dateLong ? `<p class="ev-hero-date">${escapeHtml(dateLong)}</p>` : ""}
+    </div>
+    ${infoRows.length ? `
+      <div class="ev-info-list">
+        ${infoRows.map((r) => `
+          <div class="ev-info-row">
+            <span class="ev-info-label">${escapeHtml(r.label)}</span>
+            <span class="ev-info-value">${escapeHtml(r.value)}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+    ${times.length ? `
+      <div class="ev-times-strip">
+        ${times.map((t) => `
+          <div class="ev-time">
+            <span class="ev-time-label">${escapeHtml(t.label)}</span>
+            <span class="ev-time-value">${escapeHtml(t.value.replace(" Uhr", ""))}</span>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
     ${event.briefing ? `<p class="ev-briefing">${escapeHtml(event.briefing)}</p>` : ""}
   `;
   renderContactsBlock(event);
   renderHuntersList(hunters);
+}
+
+function formatLongDate(iso) {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 }
 
 function renderContactsBlock(event) {
