@@ -1131,6 +1131,10 @@ function flattenFormControlsForPdf(clonedDoc) {
   if (!liveRoot || !clonedRoot) return;
   const liveCtrls = liveRoot.querySelectorAll("input, select, textarea");
   const clonedCtrls = clonedRoot.querySelectorAll("input, select, textarea");
+  // Read computed styles from the *clone*, which html2canvas renders at the
+  // windowWidth we pass (800px) — so even when the live phone viewport is
+  // showing the mobile card layout, the PDF lays out as the desktop table.
+  const cloneView = clonedDoc.defaultView || window;
   liveCtrls.forEach((live, i) => {
     const clone = clonedCtrls[i];
     if (!clone) return;
@@ -1143,7 +1147,7 @@ function flattenFormControlsForPdf(clonedDoc) {
     } else {
       text = live.value || "";
     }
-    const cs = getComputedStyle(live);
+    const cs = cloneView.getComputedStyle(clone);
     const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
     const borV = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
     const fontPx = parseFloat(cs.fontSize) || 13;

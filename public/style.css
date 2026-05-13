@@ -1337,6 +1337,95 @@ body {
   cursor: pointer;
 }
 
+/* Phone layout for the Anschuss-Protokoll — the 7-column table is unusable
+   below ~600px, so each Stück row becomes its own labelled card. iOS won't
+   zoom on focus when input font-size ≥ 16px, so all fields here get bumped.
+   The PDF export passes windowWidth: 800 to html2canvas, so this block does
+   NOT match in the cloned document — the PDF still uses the desktop table. */
+@media (max-width: 600px) {
+  /* Bump every protocol field to 16px so iOS doesn't zoom in on focus.
+     #protocol-modal beats the desktop .proto-table td input[type=...] rules. */
+  #protocol-modal input,
+  #protocol-modal select {
+    font-size: 16px;
+  }
+
+  /* Name / Telefon / Kaliber — one input per row on a phone. */
+  .proto-line label.grow { flex: 1 1 100%; min-width: 0; }
+
+  /* Table → labelled cards. */
+  .proto-table { display: block; font-size: 13px; margin: 8px 0 14px; }
+  .proto-table thead { display: none; }
+  .proto-table tbody { display: block; }
+  .proto-table tr {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  .proto-table td {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: none;
+    border-top: 1px solid var(--border);
+    text-align: left;
+    background: #fff;
+  }
+  .proto-table td:first-of-type { border-top: none; }
+  .proto-table td::before {
+    content: attr(data-label);
+    flex: 0 0 130px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--steel-dark);
+    line-height: 1.2;
+  }
+  .proto-table td.proto-row-head {
+    display: block;
+    background: var(--green-bright);
+    color: #111;
+    font-weight: 700;
+    text-align: center;
+    padding: 8px;
+    border-top: none;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    white-space: normal;
+  }
+  .proto-table td.proto-row-head::before { content: none; }
+
+  .proto-table td > input,
+  .proto-table td > select {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    padding: 7px 9px;
+    border-radius: 5px;
+  }
+
+  /* The "Wildart / gesch. kg" cell becomes a column inside the card so the
+     two controls each get a full-width line. */
+  .proto-table td.proto-cell-stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .proto-table td.proto-cell-stack::before {
+    flex: 0 0 auto;
+    margin-bottom: 2px;
+  }
+  .proto-table td.proto-cell-stack > input,
+  .proto-table td.proto-cell-stack > select {
+    width: 100%;
+    margin: 0;
+  }
+}
+
 @media print {
   body > *:not(#protocol-modal) { display: none !important; }
   #protocol-modal {
