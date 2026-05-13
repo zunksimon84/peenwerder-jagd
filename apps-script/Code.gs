@@ -89,6 +89,7 @@ function doGet(e) {
     if (action === "events-list") return json_(eventsList_());
     if (action === "event-detail") return json_(eventDetail_(params));
     if (action === "address-book") return json_(addressBookList_());
+    if (action === "invite-preview") return json_(invitePreview_(params));
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -1606,6 +1607,14 @@ function eventInvitesSend_(body) {
   const baseUrl = String(body.base_url || "").trim();
   if (!baseUrl) return { error: "base_url required (the site origin so the magic-link works)" };
 
+  // Optional overrides from the preview-and-edit modal. body_text must
+  // contain the literal token {link} where the magic URL gets substituted;
+  // we append it automatically if the organizer accidentally stripped it.
+  let bodyTemplate = String(body.body_text || "").trim();
+  if (!bodyTemplate) bodyTemplate = inviteEmailBodyTemplate_(ev);
+  if (bodyTemplate.indexOf("{link}") < 0) bodyTemplate += "\n\n{link}";
+  const subject = String(body.subject || "").trim() || inviteSubject_(ev);
+
   const rows = huntersSheet.getRange(2, 1, Math.max(huntersSheet.getLastRow() - 1, 0), EVENT_HUNTER_HEADER.length).getValues();
   const headers = huntersSheet.getRange(1, 1, 1, EVENT_HUNTER_HEADER.length).getValues()[0]
     .map(function (s) { return String(s).trim(); });
@@ -1630,10 +1639,9 @@ function eventInvitesSend_(body) {
       huntersSheet.getRange(i + 2, colToken + 1).setValue(token);
     }
     const link = baseUrl.replace(/\/+$/, "") + "/rsvp.html?t=" + encodeURIComponent(token);
-    const subject = "Einladung Drückjagd: " + String(ev.name || "");
-    const body = inviteEmailBody_(ev, hunter, link);
+    const mailBody = bodyTemplate.split("{link}").join(link);
     try {
-      MailApp.sendEmail({ to: email, subject: subject, body: body });
+      MailApp.sendEmail({ to: email, subject: subject, body: mailBody });
       huntersSheet.getRange(i + 2, colInvitedAt + 1).setValue(new Date().toISOString());
       if (String(rows[i][colStatus] || "").toLowerCase() !== "accepted" &&
           String(rows[i][colStatus] || "").toLowerCase() !== "declined") {
@@ -1662,10 +1670,10 @@ function eventInvitesSend_(body) {
 }
 
 // Default invitation text — mirrors the Drückjagd template Jakob keeps.
-// Placeholders: {date}, {teilgebiet}, {rsvp_deadline}, {written_invite_date},
-// {rsvp_link}, {organizer}. Sentences whose placeholder is empty are dropped
-// so the email never reads "am ." or "Teilgebiet ." with a blank.
-function inviteEmailBody_(ev, hunter, rsvpLink) {
+// inviteEmailBodyTemplate_ returns a body with the literal token {link} where
+// the magic-link goes. The organizer can preview/edit that template before
+// sending, and on send the per-hunter URL is swapped in for {link}.
+function inviteEmailBodyTemplate_(ev) {
   const eventDate = formatGermanDate_(ev.date);
   const twoWeeksBefore = addDays_(ev.date, -14);
   const rsvpDeadline = formatGermanDate_(ev.rsvp_deadline || twoWeeksBefore);
@@ -1677,7 +1685,7 @@ function inviteEmailBody_(ev, hunter, rsvpLink) {
     (eventDate || "[noch offen]") + " einladen." +
     (teilgebiet ? " " + teilgebietSentence_(teilgebiet) : "");
 
-  const lines = [
+  return [
     "Liebe Freundinnen und Freunde des Waldbaus,",
     "",
     sentence1,
@@ -1685,7 +1693,7 @@ function inviteEmailBody_(ev, hunter, rsvpLink) {
     "Ich bitte Euch, mir bis zum " + (rsvpDeadline || "[noch offen]") +
       " eine verbindliche Zusage zu machen, wenn und in welcher Funktion Ihr teilnehmen möchtet (Schütze/Treiber/Hundeführer). Nutzt dafür bitte ausschließlich diesen Anmeldelink:",
     "",
-    rsvpLink,
+    "{link}",
     "",
     "Treiber können gerne mitgebracht werden, bitte vorher mit Namen anmelden.",
     "",
@@ -1695,8 +1703,27 @@ function inviteEmailBody_(ev, hunter, rsvpLink) {
     "Ich freue mich auf zahlreiches Erscheinen und dass wir waidgerecht und mit Freude gemeinsam Beute machen. Horrido!",
     "",
     "euer " + organizer,
-  ];
-  return lines.join("\n");
+  ].join("\n");
+}
+
+function inviteSubject_(ev) {
+  return "Einladung Drückjagd: " + String(ev.name || "").trim();
+}
+
+// Public preview endpoint — frontend uses this to show the editable email
+// before sending so the organizer can amend wording.
+function invitePreview_(params) {
+  const id = String((params && params.event_id) || "").trim();
+  if (!id) return { error: "event_id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  const ev = readSheet_(SHEETS.events, EVENT_HEADER)
+    .find(function (e) { return String(e.id) === id; });
+  if (!ev) return { error: "event not found" };
+  return {
+    subject: inviteSubject_(ev),
+    body: inviteEmailBodyTemplate_(ev),
+  };
 }
 
 // "Hauptrevier" → "Wir bejagen das Teilgebiet Hauptrevier."

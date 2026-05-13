@@ -1997,6 +1997,108 @@ body.rsvp-page #rsvp-topbar {
 }
 .invite-status { font-size: 13px; color: var(--muted); }
 
+/* Invitation preview modal — review and amend the e-mail before sending. */
+#invite-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 50;
+}
+#invite-modal {
+  position: fixed;
+  z-index: 51;
+  left: 8px;
+  right: 8px;
+  top: calc(8px + var(--safe-top) + var(--vv-top));
+  bottom: calc(8px + var(--safe-bottom) + var(--vv-bottom));
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--green-bright);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+}
+#invite-modal[hidden] { display: none; }
+#invite-modal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+#invite-modal > header h2 { margin: 0; font-size: 17px; }
+#invite-close {
+  background: transparent;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.invite-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.invite-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--steel-dark);
+}
+.invite-hint code {
+  background: var(--bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.invite-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--steel-dark);
+}
+.invite-field input,
+.invite-field textarea {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+}
+.invite-field textarea {
+  resize: vertical;
+  min-height: 220px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+}
+.invite-recipients {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--steel-dark);
+  background: var(--bg);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+.invite-modal-actions {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  gap: 8px;
+}
+
 /* Toast variants used by events page (vanilla toast lives in main app). */
 body.events-page #toast {
   position: fixed;

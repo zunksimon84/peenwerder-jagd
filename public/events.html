@@ -116,7 +116,7 @@
           <datalist id="address-book-options"></datalist>
           <div id="hunters-list"></div>
           <div class="invite-actions">
-            <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
+            <button id="open-invite-preview" type="button" class="primary-btn">Einladung erstellen</button>
             <span id="invite-status" class="invite-status"></span>
           </div>
         </div>
@@ -125,6 +125,33 @@
         </div>
       </section>
     </main>
+
+    <div id="invite-backdrop" hidden></div>
+    <section id="invite-modal" hidden aria-modal="true" role="dialog" aria-labelledby="invite-modal-title">
+      <header>
+        <h2 id="invite-modal-title">Einladung prüfen</h2>
+        <button id="invite-close" type="button" aria-label="Schließen">×</button>
+      </header>
+      <div class="invite-modal-body">
+        <p class="invite-hint">
+          Prüfe und ändere den Text. Der Platzhalter <code>{link}</code> wird für jeden Jäger
+          durch seinen persönlichen Anmeldelink ersetzt.
+        </p>
+        <label class="invite-field">
+          Betreff
+          <input type="text" id="invite-subject" />
+        </label>
+        <label class="invite-field">
+          E-Mail-Text
+          <textarea id="invite-body" rows="18"></textarea>
+        </label>
+        <p class="invite-recipients" id="invite-recipients"></p>
+      </div>
+      <div class="invite-actions invite-modal-actions">
+        <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
+        <button id="invite-cancel" type="button" class="cancel-btn">Abbrechen</button>
+      </div>
+    </section>
 
     <div id="toast" hidden></div>
 

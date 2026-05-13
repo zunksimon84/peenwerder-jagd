@@ -398,6 +398,50 @@ async function removeHunter(huntId) {
   }
 }
 
+// Two-step invitation flow:
+//   1. openInvitePreview — load the rendered template (with {link} placeholder),
+//      open a modal where the organizer can edit subject + body.
+//   2. sendInvites — POST the (possibly edited) text; backend swaps {link}
+//      for each hunter's magic URL.
+async function openInvitePreview() {
+  if (!state.currentEvent) return;
+  const btn = $("#open-invite-preview");
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Lade …";
+  try {
+    const preview = await fetchJson("invite-preview", { event_id: state.currentEvent.event.id });
+    if (preview.error) throw new Error(preview.error);
+    $("#invite-subject").value = preview.subject || "";
+    $("#invite-body").value = preview.body || "";
+    const hunters = state.currentEvent.hunters || [];
+    const sendable = hunters.filter((h) => h.email && !h.invited_at);
+    const total = hunters.filter((h) => h.email).length;
+    const sent = total - sendable.length;
+    let line;
+    if (!total) {
+      line = "Noch keine Jäger mit E-Mail in der Roster — versenden ist erst möglich, wenn welche eingetragen sind.";
+    } else if (!sendable.length) {
+      line = `Alle ${total} Einladungen wurden bereits versendet — Senden überträgt keine neuen E-Mails.`;
+    } else {
+      line = `Wird an ${sendable.length} Jäger versendet${sent ? ` (${sent} bereits versendet, werden übersprungen)` : ""}.`;
+    }
+    $("#invite-recipients").textContent = line;
+    $("#invite-backdrop").hidden = false;
+    $("#invite-modal").hidden = false;
+  } catch (err) {
+    showToast(err.message || "Fehler", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+function closeInvitePreview() {
+  $("#invite-modal").hidden = true;
+  $("#invite-backdrop").hidden = true;
+}
+
 async function sendInvites() {
   if (!state.currentEvent) return;
   const btn = $("#send-invites-btn");
@@ -405,13 +449,16 @@ async function sendInvites() {
   const oldText = btn.textContent;
   btn.textContent = "Sende …";
   try {
-    // base_url = the directory holding events.html (and rsvp.html).
+    const subject = $("#invite-subject").value.trim();
+    const bodyText = $("#invite-body").value;
     const baseUrl = location.href.replace(/[^/]*$/, "");
     const data = await postJson({
       action: "event-invites-send",
       event_id: state.currentEvent.event.id,
       base_url: baseUrl,
       only_unsent: true,
+      subject,
+      body_text: bodyText,
     });
     if (data.errors && data.errors.length) {
       const failed = data.errors.map((e) => e.hunter).join(", ");
@@ -421,6 +468,7 @@ async function sendInvites() {
     } else {
       showToast(`${data.sent} Einladung${data.sent === 1 ? "" : "en"} versendet ✓`);
     }
+    closeInvitePreview();
     await loadEventDetail(state.currentEvent.event.id);
   } catch (err) {
     showToast(err.message, "error");
@@ -486,7 +534,11 @@ function wireUi() {
   $("#back-to-list").addEventListener("click", () => { location.hash = "#/"; });
   $("#add-hunter-form").addEventListener("submit", addHunter);
   $("#add-hunter-name").addEventListener("change", onHunterNamePick);
+  $("#open-invite-preview").addEventListener("click", openInvitePreview);
   $("#send-invites-btn").addEventListener("click", sendInvites);
+  $("#invite-close").addEventListener("click", closeInvitePreview);
+  $("#invite-cancel").addEventListener("click", closeInvitePreview);
+  $("#invite-backdrop").addEventListener("click", closeInvitePreview);
   $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");
