@@ -196,17 +196,44 @@ function initMap() {
   // canvas size + zoom-aware radius without us listening explicitly.
 }
 
+// ---------------- Cache (stale-while-revalidate via localStorage) ----------
+// Posts/hunters/species rarely change but bootstrap costs ~1.5 s every cold
+// start. We render from cache immediately and refresh in the background.
+const CACHE_PREFIX = "preye.cache.v1.";
+function readBootstrapCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + "bootstrap");
+    return raw ? JSON.parse(raw).data : null;
+  } catch { return null; }
+}
+function writeBootstrapCache(data) {
+  try { localStorage.setItem(CACHE_PREFIX + "bootstrap", JSON.stringify({ ts: Date.now(), data })); }
+  catch {}
+}
+
+function applyBootstrapData(data) {
+  state.posts = data.posts || [];
+  state.hunters = (data.hunters || []).slice().sort((a, b) => a.localeCompare(b, "de"));
+  state.species = data.species || [];
+}
+
 async function bootstrap() {
-  // Try Apps Script first; fall back to baked-in posts.json so the map at
-  // least renders if the backend isn't configured yet.
+  // Hydrate from cache first — instant map render on repeat visits.
+  const cached = readBootstrapCache();
+  if (cached) {
+    applyBootstrapData(cached);
+    // Refresh in the background; redraw markers when fresh data arrives.
+    refreshBootstrapInBackground();
+    return;
+  }
+  // No cache — fetch synchronously so main() has something to render.
   if (cfg.APPS_SCRIPT_URL && !cfg.APPS_SCRIPT_URL.startsWith("PASTE")) {
     try {
       const res = await fetch(backendUrl("bootstrap"));
       if (res.ok) {
         const data = await res.json();
-        state.posts = data.posts || [];
-        state.hunters = (data.hunters || []).slice().sort((a, b) => a.localeCompare(b, "de"));
-        state.species = data.species || [];
+        applyBootstrapData(data);
+        writeBootstrapCache(data);
         return;
       }
     } catch (err) {
@@ -219,6 +246,24 @@ async function bootstrap() {
   state.hunters = [];
   state.species = ["Rehwild", "Schwarzwild", "Rotwild", "Damwild", "Fuchs", "Dachs", "Hase", "Sonstiges"];
   showToast("Backend nicht konfiguriert — nur Anzeige", "error", 5000);
+}
+
+async function refreshBootstrapInBackground() {
+  if (!cfg.APPS_SCRIPT_URL || cfg.APPS_SCRIPT_URL.startsWith("PASTE")) return;
+  try {
+    const res = await fetch(backendUrl("bootstrap"));
+    if (!res.ok) return;
+    const data = await res.json();
+    // Only update + re-render if the payload actually changed.
+    const fresh = JSON.stringify(data);
+    const cachedRaw = JSON.stringify(readBootstrapCache() || {});
+    if (fresh === cachedRaw) return;
+    writeBootstrapCache(data);
+    applyBootstrapData(data);
+    if (typeof renderMarkers === "function") renderMarkers();
+  } catch (err) {
+    // Offline / 5xx — keep showing what we had cached.
+  }
 }
 
 // ---------------- Rendering ----------------

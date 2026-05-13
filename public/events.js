@@ -22,6 +22,58 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// ---------- Stale-while-revalidate cache (localStorage) ----------
+// Apps Script /exec has a 1–2 s cold-start every call. We cache the JSON
+// payload of read-only endpoints in localStorage and render from the cached
+// copy immediately, then quietly refresh in the background. Mutations call
+// invalidateCache() so the next read fetches fresh.
+const CACHE_PREFIX = "preye.cache.v1.";
+
+function cacheKey(action, params) {
+  if (!params) return CACHE_PREFIX + action;
+  const sorted = Object.keys(params).sort().map((k) => k + "=" + params[k]).join("&");
+  return CACHE_PREFIX + action + (sorted ? "?" + sorted : "");
+}
+
+function readCache(action, params) {
+  try {
+    const raw = localStorage.getItem(cacheKey(action, params));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && "data" in obj ? obj.data : null;
+  } catch { return null; }
+}
+
+function writeCache(action, params, data) {
+  const key = cacheKey(action, params);
+  try {
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch (err) {
+    if (err && err.name === "QuotaExceededError") {
+      // Drop all our cache entries and try once more.
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(CACHE_PREFIX)) localStorage.removeItem(k);
+      }
+      try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+    }
+  }
+}
+
+function invalidateCache(action, params) {
+  try { localStorage.removeItem(cacheKey(action, params)); } catch {}
+}
+
+function invalidateCachePrefix(action) {
+  try {
+    const prefix = CACHE_PREFIX + action;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+    }
+  } catch {}
+}
+
 // ---------- Network ----------
 
 function backendUrl(action, params = {}) {
@@ -155,13 +207,24 @@ function route() {
 
 async function loadEvents() {
   const list = $("#events-list");
-  list.innerHTML = "<div class='boar-loader boar-loader--center'>Lade …</div>";
+  // Hydrate from cache first so the list is on screen immediately.
+  const cached = readCache("events-list");
+  if (cached) {
+    state.events = cached;
+    renderEventsList();
+  } else {
+    list.innerHTML = "<div class='boar-loader boar-loader--center'>Lade …</div>";
+  }
   try {
-    state.events = await fetchJson("events-list");
+    const fresh = await fetchJson("events-list");
+    state.events = fresh;
+    writeCache("events-list", null, fresh);
     renderEventsList();
   } catch (err) {
-    list.innerHTML = "";
-    showToast("Fehler beim Laden: " + err.message, "error");
+    if (!cached) {
+      list.innerHTML = "";
+      showToast("Fehler beim Laden: " + err.message, "error");
+    }
   }
 }
 
@@ -213,6 +276,8 @@ async function deleteEvent(id) {
   if (!confirm("„" + name + "“ wirklich löschen? Alle Einladungen, RSVPs und Squads werden mit gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.")) return;
   try {
     await postJson({ action: "event-delete", id });
+    invalidateCache("events-list");
+    invalidateCache("event-detail", { id });
     showToast("Veranstaltung gelöscht ✓");
     await loadEvents();
   } catch (err) {
@@ -259,6 +324,7 @@ async function submitNewEvent(e) {
       nachsuchenfuehrer,
     };
     const data = await postJson(body);
+    invalidateCache("events-list");
     e.target.reset();
     $("#nsf-rows").innerHTML = "";
     showToast("Veranstaltung angelegt ✓");
@@ -273,13 +339,23 @@ async function submitNewEvent(e) {
 // ---------- Detail ----------
 
 async function loadEventDetail(id) {
-  $("#event-header").innerHTML = "<div class='boar-loader boar-loader--center'>Lade …</div>";
-  $("#hunters-list").innerHTML = "";
+  const cached = readCache("event-detail", { id });
+  if (cached) {
+    state.currentEvent = cached;
+    renderEventDetail();
+  } else {
+    $("#event-header").innerHTML = "<div class='boar-loader boar-loader--center'>Lade …</div>";
+    $("#hunters-list").innerHTML = "";
+  }
   try {
-    state.currentEvent = await fetchJson("event-detail", { id });
+    const fresh = await fetchJson("event-detail", { id });
+    state.currentEvent = fresh;
+    writeCache("event-detail", { id }, fresh);
     renderEventDetail();
   } catch (err) {
-    $("#event-header").innerHTML = "<p class='ev-error'>Fehler: " + escapeHtml(err.message) + "</p>";
+    if (!cached) {
+      $("#event-header").innerHTML = "<p class='ev-error'>Fehler: " + escapeHtml(err.message) + "</p>";
+    }
   }
 }
 
@@ -431,6 +507,9 @@ async function addHunter(e) {
       email: email,
       language: language,
     });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
+    invalidateCache("address-book");
     $("#add-hunter-name").value = "";
     $("#add-hunter-email").value = "";
     $("#add-hunter-lang").value = "de";
@@ -451,6 +530,8 @@ async function removeHunter(huntId) {
   if (!confirm("Diesen Jäger aus der Liste entfernen?")) return;
   try {
     await postJson({ action: "event-hunter-remove", id: huntId });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
     await loadEventDetail(state.currentEvent.event.id);
   } catch (err) {
     showToast(err.message, "error");
@@ -555,6 +636,8 @@ async function sendInvites() {
       subject_en: invitePreview.en.subject,
       body_text_en: invitePreview.en.body,
     });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
     if (data.errors && data.errors.length) {
       const failed = data.errors.map((e) => e.hunter).join(", ");
       showToast(`Versendet: ${data.sent}, Fehler bei: ${failed}`, "error", 6000);
@@ -647,6 +730,9 @@ async function importHuntersFromCsv(file) {
       event_id: state.currentEvent.event.id,
       hunters,
     });
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
+    invalidateCache("address-book");
     const parts = [`${r.added} hinzugefügt`];
     if (r.skipped && r.skipped.length) parts.push(`${r.skipped.length} bereits vorhanden`);
     if (r.errors && r.errors.length) parts.push(`${r.errors.length} Fehler`);
@@ -746,6 +832,9 @@ async function applyAddressBookSelection() {
       });
       added = r.added || 0;
     }
+    invalidateCache("event-detail", { id: state.currentEvent.event.id });
+    invalidateCache("events-list");
+    invalidateCache("address-book");
     const parts = [];
     if (added) parts.push(`${added} hinzugefügt`);
     if (toRemoveIds.length) parts.push(`${toRemoveIds.length} entfernt`);
@@ -763,12 +852,19 @@ async function applyAddressBookSelection() {
 // ---------- Address book ----------
 
 async function loadAddressBook() {
-  try {
-    state.addressBook = await fetchJson("address-book");
-  } catch (err) {
-    state.addressBook = [];
+  const cached = readCache("address-book");
+  if (cached) {
+    state.addressBook = cached;
+    refreshAddressBookList();
   }
-  refreshAddressBookList();
+  try {
+    const fresh = await fetchJson("address-book");
+    state.addressBook = fresh;
+    writeCache("address-book", null, fresh);
+    refreshAddressBookList();
+  } catch (err) {
+    if (!cached) state.addressBook = [];
+  }
 }
 
 function refreshAddressBookList() {
