@@ -27,7 +27,7 @@ function setState(msg, kind) {
   el.innerHTML = msg ? `<p>${msg}</p>` : "";
 }
 
-function showCurrentStatus(status) {
+function showCurrentStatus(status, role) {
   const el = $("#rsvp-current");
   if (!status || status === "pending" || status === "invited") {
     el.hidden = true;
@@ -36,10 +36,10 @@ function showCurrentStatus(status) {
   el.hidden = false;
   if (status === "accepted") {
     el.className = "rsvp-current rsvp-current-accepted";
-    el.textContent = "Aktueller Status: Zugesagt ✓ — Du kannst noch absagen, falls etwas dazwischenkommt.";
+    el.textContent = "Aktueller Status: Zugesagt " + (role ? "als " + role + " " : "") + "✓ — Du kannst die Antwort jederzeit ändern.";
   } else if (status === "declined") {
     el.className = "rsvp-current rsvp-current-declined";
-    el.textContent = "Aktueller Status: Abgesagt ✗ — Möchtest Du doch zusagen?";
+    el.textContent = "Aktueller Status: Abgesagt ✗ — Du kannst doch zusagen, falls Du es einrichten kannst.";
   } else {
     el.hidden = true;
   }
@@ -88,38 +88,48 @@ async function loadInvite() {
     if (data.event.organizer) {
       $("#rsvp-foot").textContent = "Waidmannsheil! — " + data.event.organizer;
     }
-    showCurrentStatus(data.status);
+    showCurrentStatus(data.status, data.role);
   } catch (err) {
     setState("Fehler beim Laden der Einladung: " + (err.message || err), "error");
   }
 }
 
-async function respond(choice) {
+function showRolePicker(show) {
+  $("#rsvp-actions").hidden = show;
+  $("#rsvp-role-choice").hidden = !show;
+}
+
+async function respond(choice, role) {
   const token = getToken();
   if (!token) return;
-  const accept = $("#rsvp-accept");
-  const decline = $("#rsvp-decline");
-  accept.disabled = true;
-  decline.disabled = true;
+  const buttons = document.querySelectorAll("#rsvp-actions button, .role-btn, #rsvp-role-back");
+  buttons.forEach((b) => { b.disabled = true; });
   try {
+    const payload = { action: "rsvp-respond", token, choice };
+    if (role) payload.role = role;
     const res = await fetch(cfg.APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "rsvp-respond", token, choice }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    const msg = choice === "accept" ? "Danke! Deine Zusage ist registriert ✓" : "Schade — die Absage ist registriert.";
+    const msg = choice === "accept"
+      ? "Danke! Deine Zusage als " + (role || "Teilnehmer") + " ist registriert ✓"
+      : "Schade — die Absage ist registriert.";
     $("#rsvp-card").hidden = true;
     setState(msg, choice === "accept" ? "accepted" : "declined");
   } catch (err) {
-    accept.disabled = false;
-    decline.disabled = false;
+    buttons.forEach((b) => { b.disabled = false; });
     setState("Fehler: " + (err.message || err), "error");
   }
 }
 
-$("#rsvp-accept").addEventListener("click", () => respond("accept"));
+$("#rsvp-accept").addEventListener("click", () => showRolePicker(true));
 $("#rsvp-decline").addEventListener("click", () => respond("decline"));
+$("#rsvp-role-back").addEventListener("click", () => showRolePicker(false));
+document.querySelectorAll(".role-btn").forEach((btn) => {
+  btn.addEventListener("click", () => respond("accept", btn.dataset.role));
+});
 
 loadInvite();

@@ -31,8 +31,8 @@ const POST_HEADER = ["id", "name", "area", "lat", "lng"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
-const EVENT_HEADER = ["id", "created_at", "name", "date", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status"];
-const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "invited_at", "responded_at"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status"];
+const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "role", "invited_at", "responded_at"];
 const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members"];
 const ADDRESS_BOOK_HEADER = ["name", "email"];
 
@@ -1389,6 +1389,8 @@ function eventsList_() {
       id: String(ev.id),
       name: String(ev.name || ""),
       date: String(ev.date || ""),
+      teilgebiet: String(ev.teilgebiet || ""),
+      rsvp_deadline: String(ev.rsvp_deadline || ""),
       treffpunkt: String(ev.treffpunkt || ""),
       treff_time: String(ev.treff_time || ""),
       start_time: String(ev.start_time || ""),
@@ -1418,6 +1420,7 @@ function eventDetail_(params) {
         hunter: String(h.hunter || ""),
         email: String(h.email || ""),
         status: String(h.status || "pending"),
+        role: String(h.role || ""),
         invited_at: String(h.invited_at || ""),
         responded_at: String(h.responded_at || ""),
       };
@@ -1441,6 +1444,8 @@ function eventDetail_(params) {
       id: String(ev.id),
       name: String(ev.name || ""),
       date: String(ev.date || ""),
+      teilgebiet: String(ev.teilgebiet || ""),
+      rsvp_deadline: String(ev.rsvp_deadline || ""),
       treffpunkt: String(ev.treffpunkt || ""),
       treff_time: String(ev.treff_time || ""),
       start_time: String(ev.start_time || ""),
@@ -1467,6 +1472,8 @@ function eventCreate_(body) {
     created_at: new Date().toISOString(),
     name: name,
     date: date,
+    teilgebiet: String(body.teilgebiet || "").trim(),
+    rsvp_deadline: String(body.rsvp_deadline || "").trim(),
     treffpunkt: String(body.treffpunkt || "").trim(),
     treff_time: String(body.treff_time || "").trim(),
     start_time: String(body.start_time || "").trim(),
@@ -1595,30 +1602,64 @@ function eventInvitesSend_(body) {
   return { ok: true, sent: sent, skipped: skipped, errors: errors };
 }
 
+// Default invitation text — mirrors the Drückjagd template Jakob keeps.
+// Placeholders: {date}, {teilgebiet}, {rsvp_deadline}, {written_invite_date},
+// {rsvp_link}, {organizer}. Sentences whose placeholder is empty are dropped
+// so the email never reads "am ." or "Teilgebiet ." with a blank.
 function inviteEmailBody_(ev, hunter, rsvpLink) {
-  const lines = [];
-  lines.push("Hallo " + (hunter || "") + ",");
-  lines.push("");
-  lines.push("hiermit lade ich Dich herzlich zur Drückjagd ein:");
-  lines.push("");
-  lines.push("  " + String(ev.name || ""));
-  if (ev.date) lines.push("  Datum: " + ev.date);
-  if (ev.treffpunkt) lines.push("  Treffpunkt: " + ev.treffpunkt);
-  if (ev.treff_time) lines.push("  Treffzeit: " + ev.treff_time + " Uhr");
-  if (ev.start_time) lines.push("  Beginn: " + ev.start_time + " Uhr");
-  if (ev.end_time) lines.push("  Ende: " + ev.end_time + " Uhr");
-  if (ev.briefing) {
-    lines.push("");
-    lines.push("Hinweise:");
-    lines.push(String(ev.briefing));
-  }
-  lines.push("");
-  lines.push("Bitte sage zu oder ab über den folgenden Link:");
-  lines.push(rsvpLink);
-  lines.push("");
-  lines.push("Waidmannsheil!");
-  lines.push("— " + (ev.organizer || "PREYE / Peenwerder Jagd"));
+  const eventDate = formatGermanDate_(ev.date);
+  const twoWeeksBefore = addDays_(ev.date, -14);
+  const rsvpDeadline = formatGermanDate_(ev.rsvp_deadline || twoWeeksBefore);
+  const writtenInvite = formatGermanDate_(twoWeeksBefore);
+  const teilgebiet = String(ev.teilgebiet || "").trim();
+  const organizer = String(ev.organizer || "").trim() || "Jakob";
+
+  const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in Peenwerder am " +
+    (eventDate || "[noch offen]") + " einladen." +
+    (teilgebiet ? " Wir bejagen das Teilgebiet " + teilgebiet + "." : "");
+
+  const lines = [
+    "Liebe Freundinnen und Freunde des Waldbaus,",
+    "",
+    sentence1,
+    "",
+    "Ich bitte Euch, mir bis zum " + (rsvpDeadline || "[noch offen]") +
+      " eine verbindliche Zusage zu machen, wenn und in welcher Funktion Ihr teilnehmen möchtet (Schütze/Treiber/Hundeführer). Nutzt dafür bitte ausschließlich diesen Anmeldelink:",
+    "",
+    rsvpLink,
+    "",
+    "Treiber können gerne mitgebracht werden, bitte vorher mit Namen anmelden.",
+    "",
+    "Im Laufe des " + (writtenInvite || "[noch offen]") +
+      " (zwei Wochen vorher) werdet Ihr von mir dann eine schriftliche Einladung erhalten, aus der ihr alle Details zur Anreise und zum Ablauf entnehmen könnt.",
+    "",
+    "Ich freue mich auf zahlreiches Erscheinen und dass wir waidgerecht und mit Freude gemeinsam Beute machen. Horrido!",
+    "",
+    "euer " + organizer,
+  ];
   return lines.join("\n");
+}
+
+function formatGermanDate_(isoDate) {
+  const s = String(isoDate || "").trim();
+  if (!s) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (!m) return s;
+  const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni",
+                  "Juli", "August", "September", "Oktober", "November", "Dezember"];
+  return parseInt(m[3], 10) + ". " + MONTHS[parseInt(m[2], 10) - 1] + " " + m[1];
+}
+
+function addDays_(isoDate, days) {
+  const s = String(isoDate || "").trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (!m) return "";
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return yyyy + "-" + mm + "-" + dd;
 }
 
 function rsvpInfo_(params) {
@@ -1635,9 +1676,12 @@ function rsvpInfo_(params) {
   return {
     hunter: String(eh.hunter || ""),
     status: String(eh.status || ""),
+    role: String(eh.role || ""),
     event: {
       name: String(ev.name || ""),
       date: String(ev.date || ""),
+      teilgebiet: String(ev.teilgebiet || ""),
+      rsvp_deadline: String(ev.rsvp_deadline || ""),
       treffpunkt: String(ev.treffpunkt || ""),
       treff_time: String(ev.treff_time || ""),
       start_time: String(ev.start_time || ""),
@@ -1656,6 +1700,13 @@ function rsvpRespond_(body) {
               : (choiceRaw === "decline" || choiceRaw === "declined") ? "declined"
               : "";
   if (!choice) return { error: "choice must be accept or decline" };
+  // Role is only meaningful on accept; allowlisted to the three options the
+  // template offers so the sheet doesn't fill with free-form junk.
+  const VALID_ROLES = { "Schütze": 1, "Treiber": 1, "Hundeführer": 1 };
+  let role = String(body.role || "").trim();
+  if (role && !VALID_ROLES[role]) role = "";
+  if (choice === "declined") role = "";
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
   const lastRow = sheet.getLastRow();
@@ -1665,12 +1716,14 @@ function rsvpRespond_(body) {
     .map(function (s) { return String(s).trim(); });
   const colToken = headers.indexOf("token");
   const colStatus = headers.indexOf("status");
+  const colRole = headers.indexOf("role");
   const colResponded = headers.indexOf("responded_at");
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][colToken]) === token) {
       sheet.getRange(i + 2, colStatus + 1).setValue(choice);
+      if (colRole >= 0) sheet.getRange(i + 2, colRole + 1).setValue(role);
       sheet.getRange(i + 2, colResponded + 1).setValue(new Date().toISOString());
-      return { ok: true, status: choice };
+      return { ok: true, status: choice, role: role };
     }
   }
   return { error: "not found" };

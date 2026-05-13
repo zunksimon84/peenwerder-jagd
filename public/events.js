@@ -209,6 +209,8 @@ async function submitNewEvent(e) {
       action: "event-create",
       name: $("#ev-name").value.trim(),
       date: $("#ev-date").value,
+      teilgebiet: $("#ev-teilgebiet").value.trim(),
+      rsvp_deadline: $("#ev-rsvp-deadline").value,
       treffpunkt: $("#ev-treffpunkt").value.trim(),
       treff_time: $("#ev-treff-time").value,
       start_time: $("#ev-start-time").value,
@@ -249,9 +251,14 @@ function renderEventDetail() {
     event.start_time ? `Beginn ${event.start_time}` : "",
     event.end_time ? `Ende ${event.end_time}` : "",
   ].filter(Boolean).join(" · ");
+  const subline2 = [
+    event.teilgebiet ? "Teilgebiet " + event.teilgebiet : "",
+    event.rsvp_deadline ? "Anmeldeschluss " + formatDate(event.rsvp_deadline) : "",
+  ].filter(Boolean).join(" · ");
   header.innerHTML = `
     <h2 class="ev-title">${escapeHtml(event.name)}</h2>
     <p class="ev-subline">${escapeHtml(dateStr)}${event.treffpunkt ? " · " + escapeHtml(event.treffpunkt) : ""}</p>
+    ${subline2 ? `<p class="ev-subline">${escapeHtml(subline2)}</p>` : ""}
     ${meta ? `<p class="ev-subline ev-times">${escapeHtml(meta)}</p>` : ""}
     ${event.briefing ? `<p class="ev-briefing">${escapeHtml(event.briefing)}</p>` : ""}
   `;
@@ -266,12 +273,15 @@ function renderHuntersList(hunters) {
     return;
   }
   list.innerHTML = hunters.map((h) => {
-    const statusLabel = {
+    const baseLabel = {
       accepted: "Zugesagt ✓",
       declined: "Abgesagt ✗",
       invited: "Eingeladen ⋯",
       pending: "Offen",
     }[h.status] || h.status;
+    const statusLabel = h.status === "accepted" && h.role
+      ? h.role + " ✓"
+      : baseLabel;
     return `
       <div class="hunter-row hunter-${escapeHtml(h.status || "pending")}">
         <div class="hunter-main">

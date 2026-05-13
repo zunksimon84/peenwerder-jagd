@@ -54,14 +54,16 @@
         <form id="new-event-form" class="ev-form">
           <label>Name<input type="text" id="ev-name" required placeholder="z.B. Frühjahrs-Drückjagd 2026" /></label>
           <label>Datum<input type="date" id="ev-date" required /></label>
+          <label>Teilgebiet<input type="text" id="ev-teilgebiet" placeholder="z.B. Hauptrevier, Ost, Nord" /></label>
+          <label>Anmeldeschluss <span class="muted">(leer = automatisch 2 Wochen vor dem Termin)</span><input type="date" id="ev-rsvp-deadline" /></label>
           <label>Treffpunkt<input type="text" id="ev-treffpunkt" placeholder="z.B. Hauptkanzel" /></label>
           <div class="ev-form-row">
             <label>Treffzeit<input type="time" id="ev-treff-time" /></label>
             <label>Beginn<input type="time" id="ev-start-time" /></label>
             <label>Ende<input type="time" id="ev-end-time" /></label>
           </div>
-          <label>Hinweise / Briefing<textarea id="ev-briefing" rows="4" placeholder="Wildart, Sammelplatz, besondere Hinweise …"></textarea></label>
-          <label>Organisator<input type="text" id="ev-organizer" placeholder="Dein Name" /></label>
+          <label>Weitere Hinweise <span class="muted">(optional, intern)</span><textarea id="ev-briefing" rows="3" placeholder="Notizen für Dich — werden nicht versendet."></textarea></label>
+          <label>Organisator<input type="text" id="ev-organizer" placeholder="Dein Name (Signatur in der Einladung)" /></label>
           <div class="ev-form-actions">
             <button type="submit" class="primary-btn">Anlegen</button>
             <button type="button" class="cancel-btn" id="new-event-cancel">Abbrechen</button>

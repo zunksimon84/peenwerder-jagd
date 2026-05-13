@@ -1998,6 +1998,39 @@ body.rsvp-page {
 .rsvp-accept:disabled,
 .rsvp-decline:disabled { opacity: 0.55; }
 
+.rsvp-role-choice { margin-top: 16px; }
+.rsvp-role-prompt { margin: 0 0 10px; font-weight: 600; }
+.rsvp-role-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.role-btn {
+  background: var(--card);
+  border: 1px solid var(--green-bright-edge);
+  border-radius: 7px;
+  padding: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.1s;
+}
+.role-btn:hover { background: var(--bg); }
+.role-btn:disabled { opacity: 0.55; }
+.rsvp-role-back {
+  margin-top: 10px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
 .rsvp-foot {
   margin-top: 16px;
   font-size: 12px;

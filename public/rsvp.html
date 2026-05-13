@@ -38,9 +38,19 @@
 
         <div class="rsvp-current" id="rsvp-current" hidden></div>
 
-        <div class="rsvp-actions">
+        <div class="rsvp-actions" id="rsvp-actions">
           <button id="rsvp-accept" class="primary-btn rsvp-accept" type="button">Zusagen</button>
           <button id="rsvp-decline" class="cancel-btn rsvp-decline" type="button">Absagen</button>
+        </div>
+
+        <div class="rsvp-role-choice" id="rsvp-role-choice" hidden>
+          <p class="rsvp-role-prompt">In welcher Funktion möchtest Du teilnehmen?</p>
+          <div class="rsvp-role-buttons">
+            <button class="role-btn" data-role="Schütze" type="button">Schütze</button>
+            <button class="role-btn" data-role="Treiber" type="button">Treiber</button>
+            <button class="role-btn" data-role="Hundeführer" type="button">Hundeführer</button>
+          </div>
+          <button class="rsvp-role-back" id="rsvp-role-back" type="button">← zurück</button>
         </div>
 
         <p class="rsvp-foot" id="rsvp-foot"></p>
