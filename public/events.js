@@ -943,15 +943,35 @@ function getKanzelnForEvent() {
     .sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 
+const ROMAN_NUMERALS = ["I","II","III","IV","V","VI","VII","VIII","IX","X",
+                        "XI","XII","XIII","XIV","XV","XVI","XVII","XVIII","XIX","XX"];
+function toRoman(n) { return ROMAN_NUMERALS[n - 1] || String(n); }
+
+function fromRoman(s) {
+  const map = { I:1, V:5, X:10, L:50, C:100, D:500, M:1000 };
+  const str = String(s || "").toUpperCase();
+  let result = 0;
+  for (let i = 0; i < str.length; i++) {
+    const cur = map[str[i]] || 0;
+    const next = map[str[i+1]] || 0;
+    if (next && cur < next) result -= cur;
+    else result += cur;
+  }
+  return result;
+}
+
 function nextAnstellerRundeName() {
   const existing = state.currentEvent?.squads || [];
-  // Find the highest "Ansteller Runde N" and add 1.
+  // Parse both Roman ("Runde I") and legacy Arabic ("Runde 1") numbers
+  // so re-numbering on top of older test squads works.
   let max = 0;
   for (const s of existing) {
-    const m = /Ansteller Runde\s+(\d+)/i.exec(s.name || "");
-    if (m) max = Math.max(max, parseInt(m[1], 10));
+    const m = /Ansteller Runde\s+([IVXLCDM]+|\d+)/i.exec(s.name || "");
+    if (!m) continue;
+    const num = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : fromRoman(m[1]);
+    if (num) max = Math.max(max, num);
   }
-  return "Ansteller Runde " + (max + 1);
+  return "Ansteller Runde " + toRoman(max + 1);
 }
 
 function renderSquads() {
@@ -1194,13 +1214,18 @@ async function saveSquadCard(card, squad) {
 
 async function addSquad() {
   if (!state.currentEvent) return;
-  await loadPostsIfNeeded();
-  const accepted = getAcceptedHunters();
-  if (!accepted.length) {
-    showToast("Erst Zusagen einsammeln — Ansteller Runden brauchen mind. einen zugesagten Jäger.", "error", 5000);
-    return;
-  }
+  const btn = $("#new-squad-btn");
+  if (btn.disabled) return; // guard against double-click → duplicate squads
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = "Lege an …";
   try {
+    await loadPostsIfNeeded();
+    const accepted = getAcceptedHunters();
+    if (!accepted.length) {
+      showToast("Erst Zusagen einsammeln — Ansteller Runden brauchen mind. einen zugesagten Jäger.", "error", 5000);
+      return;
+    }
     const r = await postJson({
       action: "event-squad-save",
       event_id: state.currentEvent.event.id,
@@ -1211,14 +1236,15 @@ async function addSquad() {
     });
     invalidateCache("event-detail", { id: state.currentEvent.event.id });
     await loadEventDetail(state.currentEvent.event.id);
-    // Re-show the squads tab and scroll the new card into view.
-    switchTab("squads");
     requestAnimationFrame(() => {
       const card = document.getElementById("squad-" + r.id);
       if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   } catch (err) {
     showToast(err.message || "Fehler", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
   }
 }
 
