@@ -4,6 +4,12 @@
 const cfg = window.PEENWERDER_CONFIG || {};
 
 const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+// Filled from the rsvp-info response (DOG_BREEDS server-side) so the list
+// stays in one place. Fallback used only if the fetch fails.
+let DOG_BREEDS = ["Sonstige"];
+let selectedRole = "";
 
 function escapeText(el, value) { el.textContent = String(value || ""); }
 
@@ -27,7 +33,7 @@ function setState(msg, kind) {
   el.innerHTML = msg ? `<p>${msg}</p>` : "";
 }
 
-function showCurrentStatus(status, role) {
+function showCurrentStatus(status, role, dogs) {
   const el = $("#rsvp-current");
   if (!status || status === "pending" || status === "invited") {
     el.hidden = true;
@@ -35,8 +41,11 @@ function showCurrentStatus(status, role) {
   }
   el.hidden = false;
   if (status === "accepted") {
+    const dogStr = (dogs && dogs.length)
+      ? " (mit " + dogs.map((d) => d.count + "× " + d.breed).join(", ") + ")"
+      : "";
     el.className = "rsvp-current rsvp-current-accepted";
-    el.textContent = "Aktueller Status: Zugesagt " + (role ? "als " + role + " " : "") + "✓ — Du kannst die Antwort jederzeit ändern.";
+    el.textContent = "Aktueller Status: Zugesagt " + (role ? "als " + role + dogStr + " " : "") + "✓ — Du kannst die Antwort jederzeit ändern.";
   } else if (status === "declined") {
     el.className = "rsvp-current rsvp-current-declined";
     el.textContent = "Aktueller Status: Abgesagt ✗ — Du kannst doch zusagen, falls Du es einrichten kannst.";
@@ -88,25 +97,71 @@ async function loadInvite() {
     if (data.event.organizer) {
       $("#rsvp-foot").textContent = "Waidmannsheil! — " + data.event.organizer;
     }
-    showCurrentStatus(data.status, data.role);
+    if (Array.isArray(data.breeds) && data.breeds.length) DOG_BREEDS = data.breeds;
+    showCurrentStatus(data.status, data.role, data.dogs);
   } catch (err) {
     setState("Fehler beim Laden der Einladung: " + (err.message || err), "error");
   }
 }
 
-function showRolePicker(show) {
-  $("#rsvp-actions").hidden = show;
-  $("#rsvp-role-choice").hidden = !show;
+function showSection(which) {
+  // which: "actions" | "roles" | "dogs"
+  $("#rsvp-actions").hidden = which !== "actions";
+  $("#rsvp-role-choice").hidden = which !== "roles";
+  $("#rsvp-dog-form").hidden = which !== "dogs";
 }
 
-async function respond(choice, role) {
+function pickRole(role) {
+  selectedRole = role;
+  // Treiber doesn't bring dogs — go straight to submit.
+  if (role === "Treiber") {
+    respond("accept", role, []);
+    return;
+  }
+  // Schütze/Standschneller or Hundeführer — show dog form (optional).
+  $("#dog-role-label").textContent = role;
+  $("#dog-rows").innerHTML = "";
+  showSection("dogs");
+}
+
+function addDogRow(breed, count) {
+  const row = document.createElement("div");
+  row.className = "dog-row";
+  const opts = DOG_BREEDS.map((b) =>
+    `<option${breed === b ? " selected" : ""}>${escapeHtml(b)}</option>`
+  ).join("");
+  row.innerHTML =
+    `<select class="dog-breed" aria-label="Hunderasse">` +
+    `<option value="">— Rasse wählen —</option>${opts}</select>` +
+    `<input type="number" class="dog-count" min="1" max="10" value="${Number(count) || 1}" aria-label="Anzahl" />` +
+    `<button class="dog-remove" type="button" aria-label="Entfernen">×</button>`;
+  row.querySelector(".dog-remove").addEventListener("click", () => row.remove());
+  $("#dog-rows").appendChild(row);
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function collectDogs() {
+  return $$(".dog-row").map((row) => {
+    const breed = row.querySelector(".dog-breed").value.trim();
+    const count = Math.max(1, Math.min(10, parseInt(row.querySelector(".dog-count").value, 10) || 1));
+    return breed ? { breed, count } : null;
+  }).filter(Boolean);
+}
+
+async function respond(choice, role, dogs) {
   const token = getToken();
   if (!token) return;
-  const buttons = document.querySelectorAll("#rsvp-actions button, .role-btn, #rsvp-role-back");
+  const buttons = document.querySelectorAll("button");
   buttons.forEach((b) => { b.disabled = true; });
   try {
     const payload = { action: "rsvp-respond", token, choice };
     if (role) payload.role = role;
+    if (dogs && dogs.length) payload.dogs = dogs;
     const res = await fetch(cfg.APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -114,9 +169,15 @@ async function respond(choice, role) {
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    const msg = choice === "accept"
-      ? "Danke! Deine Zusage als " + (role || "Teilnehmer") + " ist registriert ✓"
-      : "Schade — die Absage ist registriert.";
+    let msg;
+    if (choice === "accept") {
+      const dogStr = (dogs && dogs.length)
+        ? " mit " + dogs.map((d) => d.count + "× " + d.breed).join(", ")
+        : "";
+      msg = "Danke! Deine Zusage als " + (role || "Teilnehmer") + dogStr + " ist registriert ✓";
+    } else {
+      msg = "Schade — die Absage ist registriert.";
+    }
     $("#rsvp-card").hidden = true;
     setState(msg, choice === "accept" ? "accepted" : "declined");
   } catch (err) {
@@ -125,11 +186,14 @@ async function respond(choice, role) {
   }
 }
 
-$("#rsvp-accept").addEventListener("click", () => showRolePicker(true));
+$("#rsvp-accept").addEventListener("click", () => showSection("roles"));
 $("#rsvp-decline").addEventListener("click", () => respond("decline"));
-$("#rsvp-role-back").addEventListener("click", () => showRolePicker(false));
-document.querySelectorAll(".role-btn").forEach((btn) => {
-  btn.addEventListener("click", () => respond("accept", btn.dataset.role));
+$("#rsvp-role-back").addEventListener("click", () => showSection("actions"));
+$("#dog-back").addEventListener("click", () => showSection("roles"));
+$("#dog-add").addEventListener("click", () => addDogRow());
+$("#dog-submit").addEventListener("click", () => respond("accept", selectedRole, collectDogs()));
+$$(".role-btn").forEach((btn) => {
+  btn.addEventListener("click", () => pickRole(btn.dataset.role));
 });
 
 loadInvite();

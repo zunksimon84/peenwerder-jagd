@@ -32,7 +32,36 @@ const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
 const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status"];
-const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "role", "invited_at", "responded_at"];
+const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "role", "dogs", "invited_at", "responded_at"];
+
+// JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
+// the backend can validate what the RSVP page submits. "Sonstige" lets a
+// hunter declare a non-listed breed.
+const DOG_BREEDS = [
+  "Deutsch Drahthaar", "Deutsch Kurzhaar", "Pudelpointer", "Deutsch Stichelhaar",
+  "Griffon Korthals", "Drahthaariger Ungarischer Vorstehhund", "Barbet", "Weimaraner",
+  "English Pointer", "Kurzhaariger Ungarischer Vorstehhund",
+  "Braque de l'Ariège", "Braque du Bourbonnais", "Braque d'Auvergne",
+  "Braque Français", "Braque Saint-Germain", "Deutsch Langhaar",
+  "Großer Münsterländer", "Kleiner Münsterländer",
+  "English Setter", "Gordon Setter", "Irish Red Setter",
+  "Epagneul Breton", "Epagneul Français", "Epagneul Bleu de Picardie",
+  "Epagneul de Pont-Audemer", "English Cocker Spaniel", "Deutscher Wachtelhund",
+  "English Springer Spaniel", "Hannoverscher Schweißhund",
+  "Bayerischer Gebirgsschweißhund", "Alpenländische Dachsbracke",
+  "Deutscher Jagdterrier", "Foxterrier", "Parson Russell Terrier", "Teckel",
+  "Deutsche Bracke", "Westfälische Dachsbracke", "Steirische Rauhhaarbracke",
+  "Brandlbracke", "Tiroler Bracke", "Beagle", "English Foxhound",
+  "Français tricolore", "Français blanc et noir", "Slovensky Kopov",
+  "Curly Coated Retriever", "Golden Retriever", "Flat-coated Retriever",
+  "Labrador Retriever", "Chesapeake Bay Retriever",
+  "Nova Scotia Duck Tolling Retriever",
+  "Russisch-Europäischer Laika", "Ostsibirischer Laika", "Westsibirischer Laika",
+  "Black and Tan Coonhound", "Bloodhound",
+  "Grand Anglo-Français", "Harrier",
+  "Irish Red and White Setter", "Welsh Springer Spaniel",
+  "Sonstige",
+];
 const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members"];
 const ADDRESS_BOOK_HEADER = ["name", "email"];
 
@@ -1415,12 +1444,15 @@ function eventDetail_(params) {
   const hunters = readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER)
     .filter(function (h) { return String(h.event_id) === id; })
     .map(function (h) {
+      let dogs = [];
+      try { dogs = JSON.parse(String(h.dogs || "[]")); } catch (e) {}
       return {
         id: String(h.id),
         hunter: String(h.hunter || ""),
         email: String(h.email || ""),
         status: String(h.status || "pending"),
         role: String(h.role || ""),
+        dogs: Array.isArray(dogs) ? dogs : [],
         invited_at: String(h.invited_at || ""),
         responded_at: String(h.responded_at || ""),
       };
@@ -1673,10 +1705,14 @@ function rsvpInfo_(params) {
   const ev = readSheet_(SHEETS.events, EVENT_HEADER)
     .find(function (e) { return String(e.id) === String(eh.event_id); });
   if (!ev) return { error: "event not found" };
+  let dogs = [];
+  try { dogs = JSON.parse(String(eh.dogs || "[]")); } catch (e) {}
   return {
     hunter: String(eh.hunter || ""),
     status: String(eh.status || ""),
     role: String(eh.role || ""),
+    dogs: Array.isArray(dogs) ? dogs : [],
+    breeds: DOG_BREEDS,
     event: {
       name: String(ev.name || ""),
       date: String(ev.date || ""),
@@ -1700,12 +1736,28 @@ function rsvpRespond_(body) {
               : (choiceRaw === "decline" || choiceRaw === "declined") ? "declined"
               : "";
   if (!choice) return { error: "choice must be accept or decline" };
-  // Role is only meaningful on accept; allowlisted to the three options the
-  // template offers so the sheet doesn't fill with free-form junk.
-  const VALID_ROLES = { "Schütze": 1, "Treiber": 1, "Hundeführer": 1 };
+  // Role is only meaningful on accept; allowlisted so the sheet doesn't
+  // fill with free-form junk. Schütze still accepted as a legacy synonym
+  // for the (combined) Schütze/Standschneller option.
+  const VALID_ROLES = { "Schütze/Standschneller": 1, "Schütze": 1, "Treiber": 1, "Hundeführer": 1 };
   let role = String(body.role || "").trim();
   if (role && !VALID_ROLES[role]) role = "";
+  if (role === "Schütze") role = "Schütze/Standschneller";
   if (choice === "declined") role = "";
+
+  // Dogs are optional and only valid for the two roles that can bring them.
+  let dogs = [];
+  if (choice === "accepted" && (role === "Schütze/Standschneller" || role === "Hundeführer") &&
+      Array.isArray(body.dogs)) {
+    const allowed = {};
+    for (let k = 0; k < DOG_BREEDS.length; k++) allowed[DOG_BREEDS[k]] = 1;
+    for (let k = 0; k < body.dogs.length && dogs.length < 8; k++) {
+      const d = body.dogs[k] || {};
+      const breed = String(d.breed || "").trim();
+      const count = Math.max(1, Math.min(10, parseInt(d.count, 10) || 1));
+      if (breed && allowed[breed]) dogs.push({ breed: breed, count: count });
+    }
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
@@ -1717,13 +1769,15 @@ function rsvpRespond_(body) {
   const colToken = headers.indexOf("token");
   const colStatus = headers.indexOf("status");
   const colRole = headers.indexOf("role");
+  const colDogs = headers.indexOf("dogs");
   const colResponded = headers.indexOf("responded_at");
   for (let i = 0; i < rows.length; i++) {
     if (String(rows[i][colToken]) === token) {
       sheet.getRange(i + 2, colStatus + 1).setValue(choice);
       if (colRole >= 0) sheet.getRange(i + 2, colRole + 1).setValue(role);
+      if (colDogs >= 0) sheet.getRange(i + 2, colDogs + 1).setValue(choice === "accepted" ? JSON.stringify(dogs) : "");
       sheet.getRange(i + 2, colResponded + 1).setValue(new Date().toISOString());
-      return { ok: true, status: choice, role: role };
+      return { ok: true, status: choice, role: role, dogs: dogs };
     }
   }
   return { error: "not found" };

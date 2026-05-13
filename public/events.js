@@ -282,11 +282,15 @@ function renderHuntersList(hunters) {
     const statusLabel = h.status === "accepted" && h.role
       ? h.role + " ✓"
       : baseLabel;
+    const dogsText = (h.status === "accepted" && Array.isArray(h.dogs) && h.dogs.length)
+      ? "Hunde: " + h.dogs.map((d) => d.count + "× " + d.breed).join(", ")
+      : "";
     return `
       <div class="hunter-row hunter-${escapeHtml(h.status || "pending")}">
         <div class="hunter-main">
           <strong>${escapeHtml(h.hunter)}</strong>
           <span class="hunter-email">${escapeHtml(h.email || "—")}</span>
+          ${dogsText ? `<span class="hunter-dogs">${escapeHtml(dogsText)}</span>` : ""}
         </div>
         <span class="hunter-status">${escapeHtml(statusLabel)}</span>
         <button class="link-btn hunter-remove" data-hid="${escapeHtml(h.id)}" title="Entfernen">×</button>
