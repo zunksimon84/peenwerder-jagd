@@ -31,7 +31,7 @@ const POST_HEADER = ["id", "name", "area", "lat", "lng"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
-const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "teilgebiet", "rsvp_deadline", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status", "vet_name", "vet_phone", "coordinator_name", "coordinator_phone", "nachsuchenfuehrer"];
 const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "role", "dogs", "invited_at", "responded_at"];
 
 // JGHV-anerkannte Jagdhundrassen — single source of truth, baked here so
@@ -1471,6 +1471,8 @@ function eventDetail_(params) {
         members: Array.isArray(members) ? members : [],
       };
     });
+  let nsfList = [];
+  try { nsfList = JSON.parse(String(ev.nachsuchenfuehrer || "[]")); } catch (e) {}
   return {
     event: {
       id: String(ev.id),
@@ -1485,6 +1487,11 @@ function eventDetail_(params) {
       briefing: String(ev.briefing || ""),
       organizer: String(ev.organizer || ""),
       status: String(ev.status || ""),
+      vet_name: String(ev.vet_name || ""),
+      vet_phone: String(ev.vet_phone || ""),
+      coordinator_name: String(ev.coordinator_name || ""),
+      coordinator_phone: String(ev.coordinator_phone || ""),
+      nachsuchenfuehrer: Array.isArray(nsfList) ? nsfList : [],
     },
     hunters: hunters,
     squads: squads,
@@ -1499,6 +1506,17 @@ function eventCreate_(body) {
   const id = "EVT-" + Date.now().toString(36).toUpperCase();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  // Nachsuchenführer is a list of {name, phone} — store as JSON so the row
+  // stays one cell wide even when the organizer adds many.
+  let nsfList = [];
+  if (Array.isArray(body.nachsuchenfuehrer)) {
+    nsfList = body.nachsuchenfuehrer
+      .map(function (p) {
+        return { name: String(p && p.name || "").trim(), phone: String(p && p.phone || "").trim() };
+      })
+      .filter(function (p) { return p.name || p.phone; })
+      .slice(0, 20);
+  }
   appendByName_(sheet, {
     id: id,
     created_at: new Date().toISOString(),
@@ -1513,6 +1531,11 @@ function eventCreate_(body) {
     briefing: String(body.briefing || "").trim(),
     organizer: String(body.organizer || "").trim(),
     status: "draft",
+    vet_name: String(body.vet_name || "").trim(),
+    vet_phone: String(body.vet_phone || "").trim(),
+    coordinator_name: String(body.coordinator_name || "").trim(),
+    coordinator_phone: String(body.coordinator_phone || "").trim(),
+    nachsuchenfuehrer: JSON.stringify(nsfList),
   });
   return { ok: true, id: id };
 }
@@ -1648,7 +1671,7 @@ function inviteEmailBody_(ev, hunter, rsvpLink) {
 
   const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in Peenwerder am " +
     (eventDate || "[noch offen]") + " einladen." +
-    (teilgebiet ? " Wir bejagen das Teilgebiet " + teilgebiet + "." : "");
+    (teilgebiet ? " " + teilgebietSentence_(teilgebiet) : "");
 
   const lines = [
     "Liebe Freundinnen und Freunde des Waldbaus,",
@@ -1670,6 +1693,18 @@ function inviteEmailBody_(ev, hunter, rsvpLink) {
     "euer " + organizer,
   ];
   return lines.join("\n");
+}
+
+// "Hauptrevier" → "Wir bejagen das Teilgebiet Hauptrevier."
+// "Hauptrevier, Ost" → "Wir bejagen die Teilgebiete Hauptrevier und Ost."
+// "Hauptrevier, Ost, Nord" → "Wir bejagen die Teilgebiete Hauptrevier, Ost und Nord."
+function teilgebietSentence_(raw) {
+  const parts = String(raw || "").split(/\s*,\s*/).filter(function (p) { return p; });
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return "Wir bejagen das Teilgebiet " + parts[0] + ".";
+  const last = parts[parts.length - 1];
+  const head = parts.slice(0, -1).join(", ");
+  return "Wir bejagen die Teilgebiete " + head + " und " + last + ".";
 }
 
 function formatGermanDate_(isoDate) {

@@ -1694,6 +1694,120 @@ body.rsvp-page #rsvp-topbar {
   margin-top: 4px;
 }
 
+/* Fieldsets group related fields (Teilgebiete, Kontakte). */
+.ev-fieldset {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 12px 12px;
+  margin: 4px 0 0;
+}
+.ev-fieldset legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--steel-dark);
+  padding: 0 6px;
+}
+.ev-checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+.ev-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111;
+  cursor: pointer;
+}
+.ev-checkbox input[type="checkbox"] { transform: scale(1.1); }
+
+.ev-fieldset-contacts { margin-top: 4px; }
+.ev-fieldset-contacts .contact-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.ev-fieldset-contacts .contact-row > label {
+  flex: 1 1 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--steel-dark);
+}
+.ev-fieldset-contacts .contact-row input {
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.nsf-block { margin-top: 10px; }
+.nsf-label { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--steel-dark); }
+.nsf-rows { display: flex; flex-direction: column; gap: 6px; }
+.nsf-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.nsf-row .nsf-name {
+  flex: 1 1 120px;
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  min-width: 0;
+}
+.nsf-row .nsf-phone {
+  flex: 1 1 100px;
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  min-width: 0;
+}
+.nsf-row .nsf-remove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.nsf-row .nsf-remove:hover { background: var(--bg); color: var(--accent); }
+.nsf-add { margin-top: 8px; }
+
+/* Contacts panel on the event detail page. */
+.ev-contacts {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green-bright);
+  border-radius: 7px;
+  padding: 10px 14px;
+  margin: 6px 0 14px;
+  font-size: 13px;
+}
+.ev-contacts-title { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--steel-dark); }
+.ev-contacts p { margin: 2px 0; }
+.ev-contact-label { font-weight: 600; color: var(--steel-dark); margin-right: 4px; }
+.ev-nsf-list { margin: 2px 0 4px 18px; padding: 0; }
+.ev-nsf-list li { margin: 1px 0; }
+
 .primary-btn {
   background: var(--green-bright);
   color: #111;

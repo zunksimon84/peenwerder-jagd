@@ -54,7 +54,15 @@
         <form id="new-event-form" class="ev-form">
           <label>Name<input type="text" id="ev-name" required placeholder="z.B. Frühjahrs-Drückjagd 2026" /></label>
           <label>Datum<input type="date" id="ev-date" required /></label>
-          <label>Teilgebiet<input type="text" id="ev-teilgebiet" placeholder="z.B. Hauptrevier, Ost, Nord" /></label>
+          <fieldset class="ev-fieldset">
+            <legend>Teilgebiet(e) <span class="muted">(mehrfach wählbar)</span></legend>
+            <div class="ev-checkbox-grid">
+              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Hauptrevier" /> Hauptrevier</label>
+              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Ost" /> Ost</label>
+              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Nord" /> Nord</label>
+              <label class="ev-checkbox"><input type="checkbox" name="teilgebiet" value="Nordrand" /> Nordrand</label>
+            </div>
+          </fieldset>
           <label>Anmeldeschluss <span class="muted">(leer = automatisch 2 Wochen vor dem Termin)</span><input type="date" id="ev-rsvp-deadline" /></label>
           <label>Treffpunkt<input type="text" id="ev-treffpunkt" placeholder="z.B. Hauptkanzel" /></label>
           <div class="ev-form-row">
@@ -64,6 +72,24 @@
           </div>
           <label>Weitere Hinweise <span class="muted">(optional, intern)</span><textarea id="ev-briefing" rows="3" placeholder="Notizen für Dich — werden nicht versendet."></textarea></label>
           <label>Organisator<input type="text" id="ev-organizer" placeholder="Dein Name (Signatur in der Einladung)" /></label>
+
+          <fieldset class="ev-fieldset ev-fieldset-contacts">
+            <legend>Kontakte <span class="muted">(erscheinen in der schriftlichen Einladung 2 Wochen vor dem Termin)</span></legend>
+            <div class="contact-row">
+              <label>Tierarzt — Name<input type="text" id="ev-vet-name" autocomplete="off" /></label>
+              <label>Tierarzt — Mobil<input type="tel" id="ev-vet-phone" inputmode="tel" autocomplete="off" /></label>
+            </div>
+            <div class="contact-row">
+              <label>Nachsuchen-Koordinator — Name<input type="text" id="ev-coordinator-name" autocomplete="off" /></label>
+              <label>Nachsuchen-Koordinator — Mobil<input type="tel" id="ev-coordinator-phone" inputmode="tel" autocomplete="off" /></label>
+            </div>
+            <div class="nsf-block">
+              <p class="nsf-label">Nachsuchenführer <span class="muted">(beliebig viele)</span></p>
+              <div id="nsf-rows" class="nsf-rows"></div>
+              <button type="button" class="dog-add-btn nsf-add" id="ev-nsf-add">+ Nachsuchenführer hinzufügen</button>
+            </div>
+          </fieldset>
+
           <div class="ev-form-actions">
             <button type="submit" class="primary-btn">Anlegen</button>
             <button type="button" class="cancel-btn" id="new-event-cancel">Abbrechen</button>
@@ -75,6 +101,7 @@
       <section id="view-detail" class="ev-view" hidden>
         <button class="back-btn" id="back-to-list">← Übersicht</button>
         <div id="event-header"></div>
+        <div id="event-contacts" class="ev-contacts" hidden></div>
         <nav class="ev-tabs">
           <button class="ev-tab active" data-tab="invites">Einladungen</button>
           <button class="ev-tab" data-tab="squads">Squads</button>

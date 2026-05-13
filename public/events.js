@@ -205,11 +205,16 @@ async function submitNewEvent(e) {
   const btn = e.target.querySelector("button[type=submit]");
   btn.disabled = true;
   try {
+    const teilgebiet = $$("input[name=teilgebiet]:checked").map((c) => c.value).join(", ");
+    const nachsuchenfuehrer = $$("#nsf-rows .nsf-row").map((row) => ({
+      name: row.querySelector(".nsf-name").value.trim(),
+      phone: row.querySelector(".nsf-phone").value.trim(),
+    })).filter((p) => p.name || p.phone);
     const body = {
       action: "event-create",
       name: $("#ev-name").value.trim(),
       date: $("#ev-date").value,
-      teilgebiet: $("#ev-teilgebiet").value.trim(),
+      teilgebiet,
       rsvp_deadline: $("#ev-rsvp-deadline").value,
       treffpunkt: $("#ev-treffpunkt").value.trim(),
       treff_time: $("#ev-treff-time").value,
@@ -217,9 +222,15 @@ async function submitNewEvent(e) {
       end_time: $("#ev-end-time").value,
       briefing: $("#ev-briefing").value.trim(),
       organizer: $("#ev-organizer").value.trim(),
+      vet_name: $("#ev-vet-name").value.trim(),
+      vet_phone: $("#ev-vet-phone").value.trim(),
+      coordinator_name: $("#ev-coordinator-name").value.trim(),
+      coordinator_phone: $("#ev-coordinator-phone").value.trim(),
+      nachsuchenfuehrer,
     };
     const data = await postJson(body);
     e.target.reset();
+    $("#nsf-rows").innerHTML = "";
     showToast("Veranstaltung angelegt ✓");
     location.hash = "#/event/" + encodeURIComponent(data.id);
   } catch (err) {
@@ -262,7 +273,29 @@ function renderEventDetail() {
     ${meta ? `<p class="ev-subline ev-times">${escapeHtml(meta)}</p>` : ""}
     ${event.briefing ? `<p class="ev-briefing">${escapeHtml(event.briefing)}</p>` : ""}
   `;
+  renderContactsBlock(event);
   renderHuntersList(hunters);
+}
+
+function renderContactsBlock(event) {
+  const el = $("#event-contacts");
+  const lines = [];
+  const vet = [event.vet_name, event.vet_phone].filter(Boolean).join(" — ");
+  const coord = [event.coordinator_name, event.coordinator_phone].filter(Boolean).join(" — ");
+  if (vet) lines.push(`<p><span class="ev-contact-label">Tierarzt:</span> ${escapeHtml(vet)}</p>`);
+  if (coord) lines.push(`<p><span class="ev-contact-label">Nachsuchen-Koordinator:</span> ${escapeHtml(coord)}</p>`);
+  const nsf = Array.isArray(event.nachsuchenfuehrer) ? event.nachsuchenfuehrer.filter((p) => p.name || p.phone) : [];
+  if (nsf.length) {
+    const items = nsf.map((p) => `<li>${escapeHtml([p.name, p.phone].filter(Boolean).join(" — "))}</li>`).join("");
+    lines.push(`<p class="ev-contact-label">Nachsuchenführer:</p><ul class="ev-nsf-list">${items}</ul>`);
+  }
+  if (!lines.length) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
+  }
+  el.hidden = false;
+  el.innerHTML = `<h3 class="ev-contacts-title">Kontakte <span class="muted">(für die schriftliche Einladung)</span></h3>${lines.join("")}`;
 }
 
 function renderHuntersList(hunters) {
@@ -419,6 +452,17 @@ function switchTab(tab) {
 
 // ---------- Wiring ----------
 
+function addNsfRow(name, phone) {
+  const row = document.createElement("div");
+  row.className = "nsf-row";
+  row.innerHTML =
+    `<input type="text" class="nsf-name" placeholder="Name" value="${escapeHtml(name || "")}" autocomplete="off" />` +
+    `<input type="tel"  class="nsf-phone" placeholder="Mobil" inputmode="tel" value="${escapeHtml(phone || "")}" autocomplete="off" />` +
+    `<button type="button" class="nsf-remove" aria-label="Entfernen">×</button>`;
+  row.querySelector(".nsf-remove").addEventListener("click", () => row.remove());
+  $("#nsf-rows").appendChild(row);
+}
+
 function wireUi() {
   $("#new-event-btn").addEventListener("click", () => { location.hash = "#/new"; });
   $("#new-event-form").addEventListener("submit", submitNewEvent);
@@ -427,6 +471,7 @@ function wireUi() {
   $("#add-hunter-form").addEventListener("submit", addHunter);
   $("#add-hunter-name").addEventListener("change", onHunterNamePick);
   $("#send-invites-btn").addEventListener("click", sendInvites);
+  $("#ev-nsf-add").addEventListener("click", () => addNsfRow());
   $("#hunters-list").addEventListener("click", (e) => {
     const btn = e.target.closest(".hunter-remove");
     if (btn) removeHunter(btn.dataset.hid);
