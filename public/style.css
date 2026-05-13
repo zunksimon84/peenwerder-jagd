@@ -2192,10 +2192,12 @@ body.rsvp-page #rsvp-topbar {
 }
 .invite-field textarea {
   resize: vertical;
-  min-height: 220px;
-  line-height: 1.45;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-  font-size: 13px;
+  min-height: 240px;
+  line-height: 1.55;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: #232323;
 }
 .invite-recipients {
   margin: 4px 0 0;

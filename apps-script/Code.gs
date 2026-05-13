@@ -1640,9 +1640,10 @@ function eventInvitesSend_(body) {
       huntersSheet.getRange(i + 2, colToken + 1).setValue(token);
     }
     const link = baseUrl.replace(/\/+$/, "") + "/rsvp.html?t=" + encodeURIComponent(token);
-    const mailBody = bodyTemplate.split("{link}").join(link);
+    const plainBody = inviteBodyToPlain_(bodyTemplate, link);
+    const htmlBody = inviteBodyToHtml_(bodyTemplate, link);
     try {
-      MailApp.sendEmail({ to: email, subject: subject, body: mailBody });
+      MailApp.sendEmail({ to: email, subject: subject, body: plainBody, htmlBody: htmlBody });
       huntersSheet.getRange(i + 2, colInvitedAt + 1).setValue(new Date().toISOString());
       if (String(rows[i][colStatus] || "").toLowerCase() !== "accepted" &&
           String(rows[i][colStatus] || "").toLowerCase() !== "declined") {
@@ -1682,8 +1683,8 @@ function inviteEmailBodyTemplate_(ev) {
   const teilgebiet = String(ev.teilgebiet || "").trim();
   const organizer = String(ev.organizer || "").trim() || "Jakob";
 
-  const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in Peenwerder am " +
-    (eventDate || "[noch offen]") + " einladen." +
+  const sentence1 = "ich möchte Euch alle recht herzlich zur nächsten Drückjagd in Peenwerder am **" +
+    (eventDate || "[noch offen]") + "** einladen." +
     (teilgebiet ? " " + teilgebietSentence_(teilgebiet) : "");
 
   return [
@@ -1691,20 +1692,45 @@ function inviteEmailBodyTemplate_(ev) {
     "",
     sentence1,
     "",
-    "Ich bitte Euch, mir bis zum " + (rsvpDeadline || "[noch offen]") +
-      " eine verbindliche Zusage zu machen, wenn und in welcher Funktion Ihr teilnehmen möchtet (Schütze/Treiber/Hundeführer). Nutzt dafür bitte ausschließlich diesen Anmeldelink:",
+    "Ich bitte Euch, mir bis zum **" + (rsvpDeadline || "[noch offen]") +
+      "** eine verbindliche Zusage zu machen, wenn und in welcher Funktion Ihr teilnehmen möchtet (Schütze/Treiber/Hundeführer). Nutzt dafür bitte ausschließlich diesen Anmeldelink:",
     "",
     "{link}",
     "",
     "Treiber können gerne mitgebracht werden, bitte vorher mit Namen anmelden.",
     "",
-    "Im Laufe des " + (writtenInvite || "[noch offen]") +
-      " (zwei Wochen vorher) werdet Ihr von mir dann eine schriftliche Einladung erhalten, aus der ihr alle Details zur Anreise und zum Ablauf entnehmen könnt.",
+    "Im Laufe des **" + (writtenInvite || "[noch offen]") +
+      "** (zwei Wochen vorher) werdet Ihr von mir dann eine schriftliche Einladung erhalten, aus der ihr alle Details zur Anreise und zum Ablauf entnehmen könnt.",
     "",
     "Ich freue mich auf zahlreiches Erscheinen und dass wir waidgerecht und mit Freude gemeinsam Beute machen. Horrido!",
     "",
-    "euer " + organizer,
+    "euer **" + organizer + "**",
   ].join("\n");
+}
+
+// Render the editable plain-text body into HTML for the actual email so the
+// **bold** markers turn into real <b> emphasis. Plain-text fallback strips
+// the markers so subscribers without HTML still see clean text. The light
+// sans-serif inline style mirrors how the preview textarea looks in the UI.
+function inviteBodyToHtml_(text, linkUrl) {
+  let html = String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  const safeUrl = String(linkUrl || "").replace(/"/g, "&quot;");
+  const anchor = '<a href="' + safeUrl + '" style="color:#1a5f1a;">' + safeUrl + '</a>';
+  html = html.split("{link}").join(anchor);
+  html = html.split("\n").join("<br>\n");
+  return '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Helvetica Neue\',\'Segoe UI\',sans-serif;' +
+         'font-weight:400;line-height:1.55;color:#232323;font-size:15px;max-width:640px;">' +
+         html + '</div>';
+}
+
+function inviteBodyToPlain_(text, linkUrl) {
+  return String(text || "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .split("{link}").join(String(linkUrl || ""));
 }
 
 function inviteSubject_(ev) {
@@ -1753,15 +1779,17 @@ function normalizeEventDates_(ev) {
   };
 }
 
-// "Hauptrevier" → "Wir bejagen das Teilgebiet Hauptrevier."
-// "Hauptrevier, Ost" → "Wir bejagen die Teilgebiete Hauptrevier und Ost."
-// "Hauptrevier, Ost, Nord" → "Wir bejagen die Teilgebiete Hauptrevier, Ost und Nord."
+// "Hauptrevier" → "Wir bejagen das Teilgebiet **Hauptrevier**."
+// "Hauptrevier, Ost" → "Wir bejagen die Teilgebiete **Hauptrevier** und **Ost**."
+// **markers are rendered as <b>…</b> in the HTML email and stripped for the
+// plain-text fallback. See inviteBodyToHtml_ / inviteBodyToPlain_.
 function teilgebietSentence_(raw) {
   const parts = String(raw || "").split(/\s*,\s*/).filter(function (p) { return p; });
   if (parts.length === 0) return "";
-  if (parts.length === 1) return "Wir bejagen das Teilgebiet " + parts[0] + ".";
-  const last = parts[parts.length - 1];
-  const head = parts.slice(0, -1).join(", ");
+  if (parts.length === 1) return "Wir bejagen das Teilgebiet **" + parts[0] + "**.";
+  const bold = parts.map(function (p) { return "**" + p + "**"; });
+  const last = bold[bold.length - 1];
+  const head = bold.slice(0, -1).join(", ");
   return "Wir bejagen die Teilgebiete " + head + " und " + last + ".";
 }
 

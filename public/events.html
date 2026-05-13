@@ -64,7 +64,7 @@
             </div>
           </fieldset>
           <label>Anmeldeschluss <span class="muted">(leer = automatisch 2 Wochen vor dem Termin)</span><input type="date" id="ev-rsvp-deadline" /></label>
-          <label>Treffpunkt<input type="text" id="ev-treffpunkt" placeholder="z.B. Hauptkanzel" /></label>
+          <label>Treffpunkt<input type="text" id="ev-treffpunkt" value="Forsthalle Rützenfelde" /></label>
           <div class="ev-form-row">
             <label>Treffzeit<input type="time" id="ev-treff-time" /></label>
             <label>Beginn<input type="time" id="ev-start-time" /></label>
@@ -134,8 +134,9 @@
       </header>
       <div class="invite-modal-body">
         <p class="invite-hint">
-          Prüfe und ändere den Text. Der Platzhalter <code>{link}</code> wird für jeden Jäger
-          durch seinen persönlichen Anmeldelink ersetzt.
+          Prüfe und ändere den Text. <code>**Text**</code> erscheint im E-Mail
+          <b>fett</b>; <code>{link}</code> wird für jeden Jäger durch seinen
+          persönlichen Anmeldelink ersetzt.
         </p>
         <label class="invite-field">
           Betreff
