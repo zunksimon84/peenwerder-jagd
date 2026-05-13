@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#b5d33a" />
+    <title>PREYE 👁 Drückjagd</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="events-page">
+    <div id="gate" hidden>
+      <div class="gate-card">
+        <div class="gate-brand">
+          <span class="brand-pray">PREYE</span>
+          <img class="brand-eye" src="eye-logo.svg" alt="" />
+        </div>
+        <p class="gate-sub">Privater Zugang</p>
+        <form id="gate-form" autocomplete="on">
+          <input id="gate-pw" type="password" autocomplete="current-password" placeholder="Passwort" required />
+          <button type="submit">Öffnen</button>
+        </form>
+        <p id="gate-error" class="gate-error" hidden></p>
+      </div>
+    </div>
+
+    <header id="topbar">
+      <h1>
+        <a href="index.html" class="brand-link" aria-label="Zurück zur Karte">
+          <span class="brand-pray">PREYE</span>
+          <img class="brand-eye" src="eye-logo.svg" alt="" />
+        </a>
+        <span class="brand-place">Drückjagd</span>
+      </h1>
+      <nav class="filters">
+        <a href="index.html" class="filter-btn" id="back-to-map">← Karte</a>
+        <button id="new-event-btn" class="filter-btn filter-btn--alert" type="button">+ Neue Veranstaltung</button>
+      </nav>
+    </header>
+
+    <main id="events-main">
+      <!-- List view -->
+      <section id="view-list" class="ev-view">
+        <div id="events-list"></div>
+        <p id="events-empty" class="empty-msg" hidden>Noch keine Veranstaltungen angelegt.</p>
+      </section>
+
+      <!-- Create event form -->
+      <section id="view-new" class="ev-view" hidden>
+        <h2 class="ev-view-title">Neue Drückjagd</h2>
+        <form id="new-event-form" class="ev-form">
+          <label>Name<input type="text" id="ev-name" required placeholder="z.B. Frühjahrs-Drückjagd 2026" /></label>
+          <label>Datum<input type="date" id="ev-date" required /></label>
+          <label>Treffpunkt<input type="text" id="ev-treffpunkt" placeholder="z.B. Hauptkanzel" /></label>
+          <div class="ev-form-row">
+            <label>Treffzeit<input type="time" id="ev-treff-time" /></label>
+            <label>Beginn<input type="time" id="ev-start-time" /></label>
+            <label>Ende<input type="time" id="ev-end-time" /></label>
+          </div>
+          <label>Hinweise / Briefing<textarea id="ev-briefing" rows="4" placeholder="Wildart, Sammelplatz, besondere Hinweise …"></textarea></label>
+          <label>Organisator<input type="text" id="ev-organizer" placeholder="Dein Name" /></label>
+          <div class="ev-form-actions">
+            <button type="submit" class="primary-btn">Anlegen</button>
+            <button type="button" class="cancel-btn" id="new-event-cancel">Abbrechen</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Detail view -->
+      <section id="view-detail" class="ev-view" hidden>
+        <button class="back-btn" id="back-to-list">← Übersicht</button>
+        <div id="event-header"></div>
+        <nav class="ev-tabs">
+          <button class="ev-tab active" data-tab="invites">Einladungen</button>
+          <button class="ev-tab" data-tab="squads">Squads</button>
+        </nav>
+        <div class="ev-tab-panel" id="tab-invites">
+          <form id="add-hunter-form" class="add-hunter-form">
+            <input type="text" id="add-hunter-name" list="address-book-options"
+                   placeholder="Name" autocomplete="off" required />
+            <input type="email" id="add-hunter-email" placeholder="E-Mail (optional)" autocomplete="off" />
+            <button type="submit" class="primary-btn small">+ Hinzufügen</button>
+          </form>
+          <datalist id="address-book-options"></datalist>
+          <div id="hunters-list"></div>
+          <div class="invite-actions">
+            <button id="send-invites-btn" type="button" class="primary-btn">Einladungen versenden</button>
+            <span id="invite-status" class="invite-status"></span>
+          </div>
+        </div>
+        <div class="ev-tab-panel" id="tab-squads" hidden>
+          <p class="ev-placeholder">Squad-Verwaltung kommt im nächsten Update.</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" hidden></div>
+
+    <script src="config.js"></script>
+    <script src="events.js"></script>
+  </body>
+</html>

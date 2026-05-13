@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#b5d33a" />
+    <title>PREYE — Zu- / Absage Drückjagd</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anta&display=swap" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="rsvp-page">
+    <header id="rsvp-topbar">
+      <span class="brand-pray">PREYE</span>
+      <img class="brand-eye" src="eye-logo.svg" alt="" />
+      <span class="brand-place">Drückjagd</span>
+    </header>
+
+    <main id="rsvp-main">
+      <div id="rsvp-state" class="rsvp-state">
+        <p>Lade Einladung …</p>
+      </div>
+
+      <article id="rsvp-card" class="rsvp-card" hidden>
+        <p class="rsvp-greeting">Hallo <span id="rsvp-hunter"></span>,</p>
+        <p>Du bist eingeladen zur Drückjagd:</p>
+        <h1 id="rsvp-event-name" class="rsvp-event-name"></h1>
+        <dl class="rsvp-event-meta">
+          <div class="rsvp-meta-row" data-key="date"><dt>Datum</dt><dd id="rsvp-date"></dd></div>
+          <div class="rsvp-meta-row" data-key="treffpunkt" hidden><dt>Treffpunkt</dt><dd id="rsvp-treffpunkt"></dd></div>
+          <div class="rsvp-meta-row" data-key="treff_time" hidden><dt>Treffzeit</dt><dd id="rsvp-treff-time"></dd></div>
+          <div class="rsvp-meta-row" data-key="start_time" hidden><dt>Beginn</dt><dd id="rsvp-start-time"></dd></div>
+          <div class="rsvp-meta-row" data-key="end_time" hidden><dt>Ende</dt><dd id="rsvp-end-time"></dd></div>
+        </dl>
+        <p class="rsvp-briefing" id="rsvp-briefing" hidden></p>
+
+        <div class="rsvp-current" id="rsvp-current" hidden></div>
+
+        <div class="rsvp-actions">
+          <button id="rsvp-accept" class="primary-btn rsvp-accept" type="button">Zusagen</button>
+          <button id="rsvp-decline" class="cancel-btn rsvp-decline" type="button">Absagen</button>
+        </div>
+
+        <p class="rsvp-foot" id="rsvp-foot"></p>
+      </article>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="rsvp.js"></script>
+  </body>
+</html>

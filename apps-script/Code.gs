@@ -21,12 +21,20 @@ const SHEETS = {
   hunters: "hunters",
   harvests: "harvests",
   nachsuchen: "nachsuchen",
+  events: "events",
+  event_hunters: "event_hunters",
+  event_squads: "event_squads",
+  address_book: "address_book",
 };
 
 const POST_HEADER = ["id", "name", "area", "lat", "lng"];
 const HUNTER_HEADER = ["name"];
 const HARVEST_HEADER = ["timestamp", "hunter", "post_id", "species", "count", "notes", "wind_speed", "wind_dir", "gender", "age_class"];
 const NACHSUCHE_HEADER = ["id", "created_at", "hunter", "stand_nr", "post_id", "summary", "status", "closed_at", "recipient"];
+const EVENT_HEADER = ["id", "created_at", "name", "date", "treffpunkt", "treff_time", "start_time", "end_time", "briefing", "organizer", "status"];
+const EVENT_HUNTER_HEADER = ["id", "event_id", "hunter", "email", "token", "status", "invited_at", "responded_at"];
+const EVENT_SQUAD_HEADER = ["id", "event_id", "name", "post_id", "post_name", "briefing", "members"];
+const ADDRESS_BOOK_HEADER = ["name", "email"];
 
 // ---------- HTTP entrypoints ----------
 
@@ -37,6 +45,8 @@ function doGet(e) {
     // Public endpoints — no token needed.
     if (action === "site-status") return json_(siteStatus_());
     if (action === "verify-access") return json_(verifyAccess_(params));
+    // RSVP page authenticates via the per-hunter token in the URL.
+    if (action === "rsvp-info") return json_(rsvpInfo_(params));
     // Everything else requires a valid token if the site is private.
     if (!checkToken_(params.token)) {
       return json_({ error: "private", code: "AUTH_REQUIRED" });
@@ -47,6 +57,9 @@ function doGet(e) {
     if (action === "history") return json_(history_(params));
     if (action === "strecke") return json_(strecke_(params));
     if (action === "nachsuche-list") return json_(nachsucheList_());
+    if (action === "events-list") return json_(eventsList_());
+    if (action === "event-detail") return json_(eventDetail_(params));
+    if (action === "address-book") return json_(addressBookList_());
     return json_({ error: "unknown action" }, 400);
   } catch (err) {
     return json_({ error: String(err && err.message || err) }, 500);
@@ -56,16 +69,46 @@ function doGet(e) {
 function doPost(e) {
   try {
     const body = JSON.parse((e.postData && e.postData.contents) || "{}");
+    const action = body.action || "harvest";
+    // RSVP responses authenticate via the per-hunter token in the body,
+    // not the privacy gate token — so the link works without the password.
+    if (action === "rsvp-respond") {
+      const r = rsvpRespond_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
     if (!checkToken_(body.token)) {
       return json_({ error: "private", code: "AUTH_REQUIRED" });
     }
-    const action = body.action || "harvest";
     if (action === "nachsuche-create") {
       const r = nachsucheCreate_(body);
       return json_(r, r.error ? 400 : 200);
     }
     if (action === "nachsuche-close") {
       const r = nachsucheClose_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-create") {
+      const r = eventCreate_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-hunter-add") {
+      const r = eventHunterAdd_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-hunter-remove") {
+      const r = eventHunterRemove_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-invites-send") {
+      const r = eventInvitesSend_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-squad-save") {
+      const r = eventSquadSave_(body);
+      return json_(r, r.error ? 400 : 200);
+    }
+    if (action === "event-squad-delete") {
+      const r = eventSquadDelete_(body);
       return json_(r, r.error ? 400 : 200);
     }
     // default — log a harvest
@@ -1319,7 +1362,411 @@ function safeStr_(v) {
   return String(v).trim();
 }
 
+// ---------- Drückjagd / event organisation ----------
+// One driven-hunt day = one row in `events`. The roster lives in
+// `event_hunters` (one row per invited hunter, with a per-row token used
+// as the magic-link auth for the RSVP page). Optional squads live in
+// `event_squads`. `address_book` stores reusable name+email contacts so
+// you don't retype them across events.
 
+function eventsList_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const events = readSheet_(SHEETS.events, EVENT_HEADER);
+  const hunters = readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  return events.map(function (ev) {
+    const stats = { invited: 0, accepted: 0, declined: 0, pending: 0 };
+    for (let i = 0; i < hunters.length; i++) {
+      if (String(hunters[i].event_id) !== String(ev.id)) continue;
+      stats.invited++;
+      const s = String(hunters[i].status || "").toLowerCase();
+      if (s === "accepted") stats.accepted++;
+      else if (s === "declined") stats.declined++;
+      else stats.pending++;
+    }
+    return {
+      id: String(ev.id),
+      name: String(ev.name || ""),
+      date: String(ev.date || ""),
+      treffpunkt: String(ev.treffpunkt || ""),
+      treff_time: String(ev.treff_time || ""),
+      start_time: String(ev.start_time || ""),
+      end_time: String(ev.end_time || ""),
+      organizer: String(ev.organizer || ""),
+      status: String(ev.status || ""),
+      stats: stats,
+    };
+  }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+}
+
+function eventDetail_(params) {
+  const id = String((params && params.id) || "").trim();
+  if (!id) return { error: "id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
+  const ev = readSheet_(SHEETS.events, EVENT_HEADER)
+    .find(function (e) { return String(e.id) === id; });
+  if (!ev) return { error: "not found" };
+  const hunters = readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER)
+    .filter(function (h) { return String(h.event_id) === id; })
+    .map(function (h) {
+      return {
+        id: String(h.id),
+        hunter: String(h.hunter || ""),
+        email: String(h.email || ""),
+        status: String(h.status || "pending"),
+        invited_at: String(h.invited_at || ""),
+        responded_at: String(h.responded_at || ""),
+      };
+    });
+  const squads = readSheet_(SHEETS.event_squads, EVENT_SQUAD_HEADER)
+    .filter(function (s) { return String(s.event_id) === id; })
+    .map(function (s) {
+      let members = [];
+      try { members = JSON.parse(String(s.members || "[]")); } catch (e) {}
+      return {
+        id: String(s.id),
+        name: String(s.name || ""),
+        post_id: String(s.post_id || ""),
+        post_name: String(s.post_name || ""),
+        briefing: String(s.briefing || ""),
+        members: Array.isArray(members) ? members : [],
+      };
+    });
+  return {
+    event: {
+      id: String(ev.id),
+      name: String(ev.name || ""),
+      date: String(ev.date || ""),
+      treffpunkt: String(ev.treffpunkt || ""),
+      treff_time: String(ev.treff_time || ""),
+      start_time: String(ev.start_time || ""),
+      end_time: String(ev.end_time || ""),
+      briefing: String(ev.briefing || ""),
+      organizer: String(ev.organizer || ""),
+      status: String(ev.status || ""),
+    },
+    hunters: hunters,
+    squads: squads,
+  };
+}
+
+function eventCreate_(body) {
+  const name = String(body.name || "").trim();
+  if (!name) return { error: "name required" };
+  const date = String(body.date || "").trim();
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "valid date (YYYY-MM-DD) required" };
+  const id = "EVT-" + Date.now().toString(36).toUpperCase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  appendByName_(sheet, {
+    id: id,
+    created_at: new Date().toISOString(),
+    name: name,
+    date: date,
+    treffpunkt: String(body.treffpunkt || "").trim(),
+    treff_time: String(body.treff_time || "").trim(),
+    start_time: String(body.start_time || "").trim(),
+    end_time: String(body.end_time || "").trim(),
+    briefing: String(body.briefing || "").trim(),
+    organizer: String(body.organizer || "").trim(),
+    status: "draft",
+  });
+  return { ok: true, id: id };
+}
+
+function eventHunterAdd_(body) {
+  const eventId = String(body.event_id || "").trim();
+  const hunter = String(body.hunter || "").trim();
+  const email = String(body.email || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  if (!hunter) return { error: "hunter required" };
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "invalid email" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  // Reject duplicate (same event, same hunter name).
+  const existing = readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER)
+    .find(function (h) {
+      return String(h.event_id) === eventId &&
+             String(h.hunter).toLowerCase() === hunter.toLowerCase();
+    });
+  if (existing) return { error: "already on the roster" };
+  const id = "EH-" + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1000);
+  appendByName_(sheet, {
+    id: id,
+    event_id: eventId,
+    hunter: hunter,
+    email: email,
+    token: randomToken_(),
+    status: "pending",
+    invited_at: "",
+    responded_at: "",
+  });
+  // Upsert into the address book so future events autocomplete it.
+  if (email) addressBookUpsert_(hunter, email);
+  return { ok: true, id: id };
+}
+
+function eventHunterRemove_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: "not found" };
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === id) {
+      sheet.deleteRow(i + 2);
+      return { ok: true };
+    }
+  }
+  return { error: "not found" };
+}
+
+function eventInvitesSend_(body) {
+  const eventId = String(body.event_id || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  const onlyUnsent = body.only_unsent !== false; // default true
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const eventsSheet = ensureSheet_(ss, SHEETS.events, EVENT_HEADER);
+  const huntersSheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const ev = readSheet_(SHEETS.events, EVENT_HEADER)
+    .find(function (e) { return String(e.id) === eventId; });
+  if (!ev) return { error: "event not found" };
+  const baseUrl = String(body.base_url || "").trim();
+  if (!baseUrl) return { error: "base_url required (the site origin so the magic-link works)" };
+
+  const rows = huntersSheet.getRange(2, 1, Math.max(huntersSheet.getLastRow() - 1, 0), EVENT_HUNTER_HEADER.length).getValues();
+  const headers = huntersSheet.getRange(1, 1, 1, EVENT_HUNTER_HEADER.length).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const colEventId = headers.indexOf("event_id");
+  const colEmail = headers.indexOf("email");
+  const colHunter = headers.indexOf("hunter");
+  const colToken = headers.indexOf("token");
+  const colStatus = headers.indexOf("status");
+  const colInvitedAt = headers.indexOf("invited_at");
+
+  let sent = 0, skipped = 0;
+  const errors = [];
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][colEventId]) !== eventId) continue;
+    const email = String(rows[i][colEmail] || "").trim();
+    if (!email) { skipped++; continue; }
+    const invitedAt = String(rows[i][colInvitedAt] || "").trim();
+    if (onlyUnsent && invitedAt) { skipped++; continue; }
+    const hunter = String(rows[i][colHunter] || "");
+    const token = String(rows[i][colToken] || "") || randomToken_();
+    if (!String(rows[i][colToken] || "").trim()) {
+      huntersSheet.getRange(i + 2, colToken + 1).setValue(token);
+    }
+    const link = baseUrl.replace(/\/+$/, "") + "/rsvp.html?t=" + encodeURIComponent(token);
+    const subject = "Einladung Drückjagd: " + String(ev.name || "");
+    const body = inviteEmailBody_(ev, hunter, link);
+    try {
+      MailApp.sendEmail({ to: email, subject: subject, body: body });
+      huntersSheet.getRange(i + 2, colInvitedAt + 1).setValue(new Date().toISOString());
+      if (String(rows[i][colStatus] || "").toLowerCase() !== "accepted" &&
+          String(rows[i][colStatus] || "").toLowerCase() !== "declined") {
+        huntersSheet.getRange(i + 2, colStatus + 1).setValue("invited");
+      }
+      sent++;
+    } catch (err) {
+      errors.push({ hunter: hunter, error: String(err && err.message || err) });
+    }
+  }
+  // Flip the event status to "open" once at least one invitation has gone out.
+  if (sent > 0 && String(ev.status || "") === "draft") {
+    const evRows = eventsSheet.getRange(2, 1, eventsSheet.getLastRow() - 1, EVENT_HEADER.length).getValues();
+    const evHeaders = eventsSheet.getRange(1, 1, 1, EVENT_HEADER.length).getValues()[0]
+      .map(function (s) { return String(s).trim(); });
+    const idCol = evHeaders.indexOf("id");
+    const statusCol = evHeaders.indexOf("status");
+    for (let i = 0; i < evRows.length; i++) {
+      if (String(evRows[i][idCol]) === eventId) {
+        eventsSheet.getRange(i + 2, statusCol + 1).setValue("open");
+        break;
+      }
+    }
+  }
+  return { ok: true, sent: sent, skipped: skipped, errors: errors };
+}
+
+function inviteEmailBody_(ev, hunter, rsvpLink) {
+  const lines = [];
+  lines.push("Hallo " + (hunter || "") + ",");
+  lines.push("");
+  lines.push("hiermit lade ich Dich herzlich zur Drückjagd ein:");
+  lines.push("");
+  lines.push("  " + String(ev.name || ""));
+  if (ev.date) lines.push("  Datum: " + ev.date);
+  if (ev.treffpunkt) lines.push("  Treffpunkt: " + ev.treffpunkt);
+  if (ev.treff_time) lines.push("  Treffzeit: " + ev.treff_time + " Uhr");
+  if (ev.start_time) lines.push("  Beginn: " + ev.start_time + " Uhr");
+  if (ev.end_time) lines.push("  Ende: " + ev.end_time + " Uhr");
+  if (ev.briefing) {
+    lines.push("");
+    lines.push("Hinweise:");
+    lines.push(String(ev.briefing));
+  }
+  lines.push("");
+  lines.push("Bitte sage zu oder ab über den folgenden Link:");
+  lines.push(rsvpLink);
+  lines.push("");
+  lines.push("Waidmannsheil!");
+  lines.push("— " + (ev.organizer || "PREYE / Peenwerder Jagd"));
+  return lines.join("\n");
+}
+
+function rsvpInfo_(params) {
+  const token = String((params && params.token) || "").trim();
+  if (!token) return { error: "token required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const eh = readSheet_(SHEETS.event_hunters, EVENT_HUNTER_HEADER)
+    .find(function (h) { return String(h.token) === token; });
+  if (!eh) return { error: "invalid token" };
+  const ev = readSheet_(SHEETS.events, EVENT_HEADER)
+    .find(function (e) { return String(e.id) === String(eh.event_id); });
+  if (!ev) return { error: "event not found" };
+  return {
+    hunter: String(eh.hunter || ""),
+    status: String(eh.status || ""),
+    event: {
+      name: String(ev.name || ""),
+      date: String(ev.date || ""),
+      treffpunkt: String(ev.treffpunkt || ""),
+      treff_time: String(ev.treff_time || ""),
+      start_time: String(ev.start_time || ""),
+      end_time: String(ev.end_time || ""),
+      briefing: String(ev.briefing || ""),
+      organizer: String(ev.organizer || ""),
+    },
+  };
+}
+
+function rsvpRespond_(body) {
+  const token = String(body.token || "").trim();
+  const choiceRaw = String(body.choice || "").toLowerCase();
+  if (!token) return { error: "token required" };
+  const choice = (choiceRaw === "accept" || choiceRaw === "accepted") ? "accepted"
+              : (choiceRaw === "decline" || choiceRaw === "declined") ? "declined"
+              : "";
+  if (!choice) return { error: "choice must be accept or decline" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.event_hunters, EVENT_HUNTER_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: "not found" };
+  const rows = sheet.getRange(2, 1, lastRow - 1, EVENT_HUNTER_HEADER.length).getValues();
+  const headers = sheet.getRange(1, 1, 1, EVENT_HUNTER_HEADER.length).getValues()[0]
+    .map(function (s) { return String(s).trim(); });
+  const colToken = headers.indexOf("token");
+  const colStatus = headers.indexOf("status");
+  const colResponded = headers.indexOf("responded_at");
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][colToken]) === token) {
+      sheet.getRange(i + 2, colStatus + 1).setValue(choice);
+      sheet.getRange(i + 2, colResponded + 1).setValue(new Date().toISOString());
+      return { ok: true, status: choice };
+    }
+  }
+  return { error: "not found" };
+}
+
+function eventSquadSave_(body) {
+  const eventId = String(body.event_id || "").trim();
+  if (!eventId) return { error: "event_id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
+  const name = String(body.name || "").trim();
+  const postId = String(body.post_id || "").trim();
+  const postName = String(body.post_name || "").trim();
+  const briefing = String(body.briefing || "").trim();
+  const members = Array.isArray(body.members)
+    ? body.members.filter(function (m) { return typeof m === "string" && m.trim(); }).map(function (m) { return m.trim(); })
+    : [];
+  const membersJson = JSON.stringify(members);
+  const id = String(body.id || "").trim();
+  if (id) {
+    // Update existing row.
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { error: "not found" };
+    const rows = sheet.getRange(2, 1, lastRow - 1, EVENT_SQUAD_HEADER.length).getValues();
+    const headers = sheet.getRange(1, 1, 1, EVENT_SQUAD_HEADER.length).getValues()[0]
+      .map(function (s) { return String(s).trim(); });
+    const idCol = headers.indexOf("id");
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][idCol]) === id) {
+        const row = [id, eventId, name, postId, postName, briefing, membersJson];
+        sheet.getRange(i + 2, 1, 1, EVENT_SQUAD_HEADER.length).setValues([row]);
+        return { ok: true, id: id };
+      }
+    }
+    return { error: "not found" };
+  }
+  const newId = "ES-" + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1000);
+  appendByName_(sheet, {
+    id: newId,
+    event_id: eventId,
+    name: name,
+    post_id: postId,
+    post_name: postName,
+    briefing: briefing,
+    members: membersJson,
+  });
+  return { ok: true, id: newId };
+}
+
+function eventSquadDelete_(body) {
+  const id = String(body.id || "").trim();
+  if (!id) return { error: "id required" };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.event_squads, EVENT_SQUAD_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { error: "not found" };
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]).trim() === id) {
+      sheet.deleteRow(i + 2);
+      return { ok: true };
+    }
+  }
+  return { error: "not found" };
+}
+
+function addressBookList_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  return readSheet_(SHEETS.address_book, ADDRESS_BOOK_HEADER).map(function (r) {
+    return { name: String(r.name || ""), email: String(r.email || "") };
+  });
+}
+
+function addressBookUpsert_(name, email) {
+  if (!name || !email) return;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSheet_(ss, SHEETS.address_book, ADDRESS_BOOK_HEADER);
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const rows = sheet.getRange(2, 1, lastRow - 1, ADDRESS_BOOK_HEADER.length).getValues();
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim().toLowerCase() === name.toLowerCase()) {
+        sheet.getRange(i + 2, 2).setValue(email);
+        return;
+      }
+    }
+  }
+  sheet.appendRow([name, email]);
+}
+
+function randomToken_() {
+  // 16 url-safe hex chars from Apps Script's UUID — enough to be
+  // unguessable for an invitation link in a small hunting group.
+  return Utilities.getUuid().replace(/-/g, "").slice(0, 16);
+}
 
 // Inlined post data — generated by tools/bake-posts.
 // To regenerate: node tools/parse-kml.mjs && node -e ... (see README).

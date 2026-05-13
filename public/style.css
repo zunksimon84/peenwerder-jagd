@@ -1541,3 +1541,478 @@ body {
     border-radius: 16px;
   }
 }
+
+/* ===========================================================================
+   Drückjagd organisation page (events.html) + invitation page (rsvp.html).
+   Reuses the brand palette but flows like a normal scrolling document instead
+   of the map's fixed-overlay layout.
+   =========================================================================== */
+
+body.events-page,
+body.rsvp-page {
+  overflow: auto;
+  background: var(--bg);
+}
+
+body.events-page #topbar,
+body.rsvp-page #rsvp-topbar {
+  position: static;
+}
+
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+
+#events-main {
+  padding: 16px 14px 32px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.ev-view-title {
+  margin: 4px 0 12px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.ev-loading,
+.empty-msg {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 12px 0;
+}
+
+.ev-error {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+/* List view ---------------------------------------------------------------- */
+
+#events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.event-card {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.12s, transform 0.08s;
+}
+.event-card:hover { border-color: var(--green-bright-edge); }
+.event-card:active { transform: scale(0.99); }
+
+.event-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.event-card-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.event-date {
+  font-size: 13px;
+  color: var(--steel-dark);
+  white-space: nowrap;
+}
+
+.event-meta {
+  margin: 4px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.event-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.event-stats .stat { color: var(--steel-dark); }
+.event-stats .stat-accepted { color: #1f7a31; font-weight: 600; }
+.event-stats .stat-declined { color: #c0392b; font-weight: 600; }
+.event-stats .stat-pending  { color: #8a6d00; font-weight: 600; }
+
+/* New event form ----------------------------------------------------------- */
+
+.ev-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.ev-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--steel-dark);
+}
+
+.ev-form input,
+.ev-form textarea {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+.ev-form textarea { resize: vertical; min-height: 80px; }
+
+.ev-form-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ev-form-row > label { flex: 1 1 100px; }
+
+.ev-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.primary-btn {
+  background: var(--green-bright);
+  color: #111;
+  border: 1px solid var(--green-bright-edge);
+  border-radius: 6px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+}
+.primary-btn:disabled { opacity: 0.55; }
+.primary-btn.small { padding: 7px 12px; font-size: 13px; }
+
+.ev-form-actions .cancel-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--steel-dark);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* Detail view -------------------------------------------------------------- */
+
+.back-btn {
+  background: transparent;
+  border: none;
+  color: var(--steel-dark);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 8px;
+}
+.back-btn:hover { color: #111; }
+
+#event-header {
+  margin-bottom: 14px;
+}
+.ev-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.ev-subline { margin: 2px 0; color: var(--steel-dark); font-size: 13px; }
+.ev-times { color: var(--muted); }
+.ev-briefing {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-left: 3px solid var(--green-bright);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.ev-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 12px 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ev-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.ev-tab.active {
+  color: #111;
+  font-weight: 600;
+  border-bottom-color: var(--green-bright);
+}
+
+.ev-placeholder { color: var(--muted); font-size: 14px; padding: 12px 0; }
+
+/* Add-hunter form ---------------------------------------------------------- */
+
+.add-hunter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.add-hunter-form input {
+  flex: 1 1 130px;
+  font: inherit;
+  font-size: 14px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* Hunter list -------------------------------------------------------------- */
+
+#hunters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.hunter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.hunter-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.hunter-main strong { font-size: 14px; }
+.hunter-email {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hunter-status {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hunter-accepted .hunter-status { color: #1f7a31; }
+.hunter-declined .hunter-status { color: #c0392b; }
+.hunter-invited  .hunter-status { color: #8a6d00; }
+.hunter-pending  .hunter-status { color: var(--muted); }
+
+.hunter-remove {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  line-height: 1;
+}
+.hunter-remove:hover { background: var(--bg); color: var(--accent); }
+
+.link-btn { background: transparent; border: none; cursor: pointer; }
+
+.invite-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.invite-status { font-size: 13px; color: var(--muted); }
+
+/* Toast variants used by events page (vanilla toast lives in main app). */
+body.events-page #toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: #111;
+  color: var(--green-bright);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+body.events-page #toast.toast-error { background: #c0392b; color: #fff; }
+
+/* RSVP page (rsvp.html) ---------------------------------------------------- */
+
+body.rsvp-page {
+  background: linear-gradient(180deg, var(--green-bright) 0%, var(--bg) 200px);
+  min-height: 100vh;
+}
+
+#rsvp-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  color: #111;
+}
+
+#rsvp-main {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 8px 14px 40px;
+}
+
+.rsvp-state {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--steel-dark);
+}
+.rsvp-state-error { color: var(--accent); }
+.rsvp-state-accepted, .rsvp-state-declined {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+  color: #111;
+  margin-top: 16px;
+}
+.rsvp-state-accepted p::before { content: "✓ "; color: #1f7a31; font-weight: 700; }
+.rsvp-state-declined p::before { content: "✗ "; color: #c0392b; font-weight: 700; }
+
+.rsvp-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+.rsvp-greeting { margin: 0 0 8px; font-size: 15px; color: var(--steel-dark); }
+.rsvp-event-name {
+  margin: 6px 0 14px;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.rsvp-event-meta {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.rsvp-meta-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+  font-size: 14px;
+}
+.rsvp-meta-row dt { color: var(--muted); font-weight: 500; margin: 0; }
+.rsvp-meta-row dd { margin: 0; color: #111; }
+
+.rsvp-briefing {
+  margin: 12px 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-left: 3px solid var(--green-bright);
+  border-radius: 4px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  color: var(--steel-dark);
+}
+
+.rsvp-current {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rsvp-current-accepted { background: #e8f5e9; color: #1f7a31; }
+.rsvp-current-declined { background: #fbe9e7; color: #c0392b; }
+
+.rsvp-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.rsvp-accept {
+  flex: 1;
+  background: var(--green-bright);
+  color: #111;
+  border: 1px solid var(--green-bright-edge);
+  border-radius: 7px;
+  padding: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rsvp-decline {
+  flex: 1;
+  background: #fff;
+  color: var(--steel-dark);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 12px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rsvp-accept:disabled,
+.rsvp-decline:disabled { opacity: 0.55; }
+
+.rsvp-foot {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  body.events-page #topbar { gap: 8px; padding: calc(8px + var(--safe-top)) 12px 8px; }
+  .ev-view-title { font-size: 18px; }
+  .ev-title { font-size: 19px; }
+  .add-hunter-form { flex-direction: column; }
+  .add-hunter-form input { flex: none; width: 100%; }
+  .add-hunter-form button { align-self: stretch; }
+  .rsvp-event-name { font-size: 20px; }
+  .rsvp-meta-row { grid-template-columns: 90px 1fr; }
+}
