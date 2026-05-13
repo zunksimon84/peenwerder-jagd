@@ -1079,7 +1079,8 @@ body {
 }
 
 .proto-line label.grow { flex: 1; min-width: 140px; }
-.proto-line label.grow input { flex: 1; }
+.proto-line label.grow input,
+.proto-line label.grow select { flex: 1; }
 
 .proto-chk { font-weight: 500; }
 .proto-chk input { width: auto; }
